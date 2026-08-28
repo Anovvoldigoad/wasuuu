@@ -112,8 +112,31 @@ namespace DynamicData
 
 namespace System.Windows.Media.Imaging
 {
+    // Portable stand-ins for WPF imaging types. The Android compiler only
+    // carries these properties as legacy UI metadata; semantic parameter
+    // merge never renders them.
+    public class BitmapSource
+    {
+        public byte[] Data { get; init; } = Array.Empty<byte>();
+    }
+
+    public sealed class BitmapFrame : BitmapSource
+    {
+        private BitmapFrame(byte[] data) { Data = data; }
+
+        public static BitmapFrame Create(System.IO.Stream stream)
+        {
+            if (stream is null) return new BitmapFrame(Array.Empty<byte>());
+            using var copy = new System.IO.MemoryStream();
+            if (stream.CanSeek) stream.Position = 0;
+            stream.CopyTo(copy);
+            return new BitmapFrame(copy.ToArray());
+        }
+    }
+
     public enum BitmapCacheOption { Default, OnLoad }
-    public sealed class BitmapImage
+
+    public sealed class BitmapImage : BitmapSource
     {
         public Uri? UriSource { get; set; }
         public BitmapCacheOption CacheOption { get; set; }
