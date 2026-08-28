@@ -1,0 +1,75 @@
+name: Build Android APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install .NET Android workload
+        run: dotnet workload install android
+
+      - name: Resolve Android NDK
+        shell: bash
+        run: |
+          if [ -n "${ANDROID_NDK_LATEST_HOME:-}" ] && [ -d "$ANDROID_NDK_LATEST_HOME" ]; then
+            echo "ANDROID_NDK=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
+          else
+            NDK=$(find "$ANDROID_SDK_ROOT/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+            echo "ANDROID_NDK=$NDK" >> "$GITHUB_ENV"
+          fi
+
+      - name: Fetch cross-platform CPK toolkit
+        run: |
+          git clone --depth 1 https://github.com/darkruss48/cpk-toolkit.git third_party/cpk-toolkit
+
+      - name: Build native CPK bridge (arm64-v8a)
+        shell: bash
+        run: |
+          cmake -S native -B native/build \
+            -DCPK_TOOLKIT_DIR="$GITHUB_WORKSPACE/third_party/cpk-toolkit" \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-26 \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build native/build --config Release -j2
+          mkdir -p native-libs/arm64-v8a
+          cp native/build/libcpkbridge.so native-libs/arm64-v8a/libcpkbridge.so
+          file native-libs/arm64-v8a/libcpkbridge.so
+
+      - name: Install Android SDK dependencies
+        shell: bash
+        run: |
+          dotnet build NSC-ModManager.Android.csproj \
+            -t:InstallAndroidDependencies \
+            -f net8.0-android34.0 \
+            -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" \
+            -p:AcceptAndroidSdkLicenses=True
+
+      - name: Build APK
+        run: |
+          dotnet publish NSC-ModManager.Android.csproj \
+            -c Release \
+            -f net8.0-android34.0 \
+            -p:AndroidPackageFormat=apk \
+            -p:AndroidSupportedAbis=arm64-v8a
+
+      - name: Collect APK
+        shell: bash
+        run: |
+          mkdir -p artifact
+          find bin/Release -type f -name '*.apk' -print -exec cp {} artifact/ \;
+          test -n "$(find artifact -name '*.apk' -print -quit)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NSC-ModManager-Android-arm64
+          path: artifact/*.apk
