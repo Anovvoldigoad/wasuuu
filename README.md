@@ -3,7 +3,7 @@
 Native Android/ARM64 port started from NSC ModManager 2.1.1.0 behavior. This build does **not** use Wine, Winlator, WPF, WinForms, Proton, Box64 or FEX.
 
 ## Implemented now
-- Native .NET for Android UI (`net8.0-android34.0`)
+- Native .NET for Android UI (`net10.0-android`)
 - ARM64-only APK
 - All-files-storage permission helper for sideload use
 - Editable real game path

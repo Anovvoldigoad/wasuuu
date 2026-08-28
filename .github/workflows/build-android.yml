@@ -12,7 +12,10 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 10.0.400
+
+      - name: Show .NET info
+        run: dotnet --info
 
       - name: Install .NET Android workload
         run: dotnet workload install android
@@ -24,11 +27,16 @@ jobs:
             echo "ANDROID_NDK=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
           else
             NDK=$(find "$ANDROID_SDK_ROOT/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+            if [ -z "$NDK" ]; then
+              echo "Android NDK not found under $ANDROID_SDK_ROOT/ndk" >&2
+              exit 1
+            fi
             echo "ANDROID_NDK=$NDK" >> "$GITHUB_ENV"
           fi
 
       - name: Fetch cross-platform CPK toolkit
         run: |
+          rm -rf third_party/cpk-toolkit
           git clone --depth 1 https://github.com/darkruss48/cpk-toolkit.git third_party/cpk-toolkit
 
       - name: Build native CPK bridge (arm64-v8a)
@@ -50,26 +58,30 @@ jobs:
         run: |
           dotnet build NSC-ModManager.Android.csproj \
             -t:InstallAndroidDependencies \
-            -f net8.0-android34.0 \
+            -f net10.0-android \
+            -p:RuntimeIdentifier=android-arm64 \
             -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" \
             -p:AcceptAndroidSdkLicenses=True
 
       - name: Build APK
+        shell: bash
         run: |
           dotnet publish NSC-ModManager.Android.csproj \
             -c Release \
-            -f net8.0-android34.0 \
-            -p:AndroidPackageFormat=apk \
-            -p:AndroidSupportedAbis=arm64-v8a
+            -f net10.0-android \
+            -r android-arm64 \
+            -p:AndroidPackageFormat=apk
 
       - name: Collect APK
         shell: bash
         run: |
           mkdir -p artifact
           find bin/Release -type f -name '*.apk' -print -exec cp {} artifact/ \;
+          echo "Collected APKs:"
+          ls -lah artifact || true
           test -n "$(find artifact -name '*.apk' -print -quit)"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: NSC-ModManager-Android-arm64
+          name: NSC-ModManager-Android-arm64-net10
           path: artifact/*.apk
