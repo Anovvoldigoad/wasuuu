@@ -42,16 +42,23 @@ jobs:
       - name: Build native CPK bridge (arm64-v8a)
         shell: bash
         run: |
-          cmake -S native -B native/build \
+          # Keep CMake output OUTSIDE the project tree. .NET for Android auto-discovers
+          # .so files under the project and would otherwise package native/build/*.so too.
+          rm -rf native/build native-libs
+          CPK_BUILD_DIR="$RUNNER_TEMP/nsc-cpk-build"
+          rm -rf "$CPK_BUILD_DIR"
+          cmake -S native -B "$CPK_BUILD_DIR" \
             -DCPK_TOOLKIT_DIR="$GITHUB_WORKSPACE/third_party/cpk-toolkit" \
             -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK/build/cmake/android.toolchain.cmake" \
             -DANDROID_ABI=arm64-v8a \
             -DANDROID_PLATFORM=android-26 \
             -DCMAKE_BUILD_TYPE=Release
-          cmake --build native/build --config Release -j2
+          cmake --build "$CPK_BUILD_DIR" --config Release -j2
           mkdir -p native-libs/arm64-v8a
-          cp native/build/libcpkbridge.so native-libs/arm64-v8a/libcpkbridge.so
+          cp "$CPK_BUILD_DIR/libcpkbridge.so" native-libs/arm64-v8a/libcpkbridge.so
           file native-libs/arm64-v8a/libcpkbridge.so
+          echo "Native libraries visible inside project:"
+          find . -type f -name '*.so' -not -path './obj/*' -not -path './bin/*' -print
 
       - name: Install Android SDK dependencies
         shell: bash

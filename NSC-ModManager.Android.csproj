@@ -6,8 +6,8 @@
     <AssemblyName>NSCModManagerAndroid</AssemblyName>
     <ApplicationId>com.nscmodmanager.android</ApplicationId>
     <ApplicationTitle>NSC Mod Manager Android</ApplicationTitle>
-    <ApplicationVersion>3</ApplicationVersion>
-    <ApplicationDisplayVersion>0.1.3</ApplicationDisplayVersion>
+    <ApplicationVersion>4</ApplicationVersion>
+    <ApplicationDisplayVersion>0.1.4</ApplicationDisplayVersion>
     <SupportedOSPlatformVersion>26.0</SupportedOSPlatformVersion>
     <AndroidUseSharedRuntime>false</AndroidUseSharedRuntime>
     <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
@@ -18,7 +18,4 @@
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
-  <ItemGroup>
-    <AndroidNativeLibrary Include="native-libs\arm64-v8a\libcpkbridge.so" Condition="Exists('native-libs\arm64-v8a\libcpkbridge.so')" Link="lib\arm64-v8a\libcpkbridge.so" />
-  </ItemGroup>
 </Project>
