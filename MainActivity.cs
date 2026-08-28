@@ -25,6 +25,7 @@ public sealed class MainActivity : Activity
     readonly AndroidCompiler _compiler = new();
     List<ModInfo> _mods = new();
     string _payloadZip = "";
+    string _baseParamZip = "";
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -38,21 +39,25 @@ public sealed class MainActivity : Activity
     void BootstrapAssets()
     {
         string baseDir = FilesDir?.AbsolutePath ?? throw new InvalidOperationException("Android FilesDir is unavailable.");
-        CopyAssetIfMissing("Resources/TemplateImages/stage_icon.dds",
+        CopyBundledAsset("Resources/TemplateImages/stage_icon.dds",
             Path.Combine(baseDir, "Resources", "TemplateImages", "stage_icon.dds"));
         _payloadZip = Path.Combine(baseDir, "Payload", "moddingapi_payload.zip");
-        CopyAssetIfMissing("Payload/moddingapi_payload.zip", _payloadZip);
+        CopyBundledAsset("Payload/moddingapi_payload.zip", _payloadZip);
+        _baseParamZip = Path.Combine(baseDir, "Payload", "nsc_param_base.zip");
+        CopyBundledAsset("Payload/nsc_param_base.zip", _baseParamZip);
         Directory.SetCurrentDirectory(baseDir);
     }
 
-    void CopyAssetIfMissing(string assetName, string destination)
+    void CopyBundledAsset(string assetName, string destination)
     {
-        if (File.Exists(destination)) return;
         string? dir = Path.GetDirectoryName(destination);
         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-        using var src = Assets?.Open(assetName) ?? throw new FileNotFoundException("APK asset missing: " + assetName);
-        using var dst = File.Create(destination);
-        src.CopyTo(dst);
+        string temp = destination + ".new";
+        if (File.Exists(temp)) File.Delete(temp);
+        using (var src = Assets?.Open(assetName) ?? throw new FileNotFoundException("APK asset missing: " + assetName))
+        using (var dst = File.Create(temp))
+            src.CopyTo(dst);
+        File.Move(temp, destination, true);
     }
 
     void BuildUi()
@@ -63,7 +68,7 @@ public sealed class MainActivity : Activity
         scroll.AddView(root);
 
         root.AddView(new TextView(this) { Text = "NSC Mod Manager — Android ARM64", TextSize = 22 });
-        root.AddView(new TextView(this) { Text = "Phase 2A: native CPK/resource compiler. No Winlator/Wine required." });
+        root.AddView(new TextView(this) { Text = "Phase 2B: native CPK + semantic character/stage XFBIN compiler. No Winlator/Wine required." });
 
         root.AddView(new TextView(this) { Text = "Game directory" });
         _gamePath = new EditText(this) { Text = _prefs.GamePath, Hint = "/storage/.../Storm Connections" };
@@ -269,6 +274,7 @@ public sealed class MainActivity : Activity
             var check = PathValidator.ValidateGamePath(_prefs.GamePath);
             if (!check.Ok) { SetStatus(check.Message); return; }
             if (!File.Exists(_payloadZip)) { SetStatus("Bundled ModdingAPI payload is missing from APK."); return; }
+            if (!File.Exists(_baseParamZip)) { SetStatus("Bundled NSC parameter baseline is missing from APK."); return; }
 
             _compileButton.Enabled = false;
             SetStatus("Starting compile...");
@@ -276,7 +282,7 @@ public sealed class MainActivity : Activity
             IProgress<string> progress = new Progress<string>(message => SetStatus(message));
 
             CompileResult result = await Task.Run(() =>
-                _compiler.Compile(_prefs.GamePath, _prefs.ModsPath, _payloadZip, work, message => progress.Report(message)));
+                _compiler.Compile(_prefs.GamePath, _prefs.ModsPath, _payloadZip, _baseParamZip, work, message => progress.Report(message)));
 
             string suffix = result.Warnings.Count == 0
                 ? ""
@@ -289,11 +295,35 @@ public sealed class MainActivity : Activity
         }
         catch (Exception ex)
         {
-            SetStatus("Compile failed: " + ex.Message);
+            string? errorPath = TryWriteCompileError(ex);
+            SetStatus("Compile failed: " + ex.Message + (errorPath is null ? "" : " | see nsc_android_last_error.txt"));
         }
         finally
         {
             _compileButton.Enabled = true;
+        }
+    }
+
+    string? TryWriteCompileError(Exception ex)
+    {
+        try
+        {
+            string game = _prefs.GamePath;
+            if (string.IsNullOrWhiteSpace(game) || !Directory.Exists(game)) return null;
+            string dir = Path.Combine(game, "moddingapi", "mods", "base_game");
+            Directory.CreateDirectory(dir);
+            string path = Path.Combine(dir, "nsc_android_last_error.txt");
+            File.WriteAllText(path,
+                "NSC Mod Manager Android — Phase 2B last compile error" + Environment.NewLine +
+                "Time: " + DateTime.Now.ToString("O") + Environment.NewLine +
+                "App: 0.3.1" + Environment.NewLine +
+                "Game: " + game + Environment.NewLine + Environment.NewLine +
+                ex.ToString());
+            return path;
+        }
+        catch
+        {
+            return null;
         }
     }
 

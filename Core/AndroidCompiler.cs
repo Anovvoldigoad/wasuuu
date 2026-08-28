@@ -10,6 +10,7 @@ public sealed class AndroidCompiler
         string gamePath,
         string modsPath,
         string moddingApiPayloadZip,
+        string baseParamZip,
         string workRoot,
         Action<string>? progress = null,
         CancellationToken cancellationToken = default)
@@ -49,7 +50,8 @@ public sealed class AndroidCompiler
 
             // Old .nus4 conversion and native NSC packages may place parameter-like data under
             // Characters/Stages. Count and validate them now, but do not perform an unsafe whole-file
-            // override. Phase 2B will merge their records into vanilla parameter XFBINs.
+            // override. Phase 2B merges owned records through character/stage configs into
+            // the bundled vanilla baseline instead of installing whole-file overrides.
             ScanPendingParameterFiles(mod, result);
             result.CharacterConfigsDetected += Directory.EnumerateFiles(mod.RootPath, "character_config.ini", SearchOption.AllDirectories).Count();
             result.StageConfigsDetected += Directory.EnumerateFiles(mod.RootPath, "stage_config.ini", SearchOption.AllDirectories).Count();
@@ -73,6 +75,20 @@ public sealed class AndroidCompiler
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        LegacyParamCompiler.Output? paramOutput = null;
+        if (result.CharacterConfigsDetected > 0 || result.StageConfigsDetected > 0)
+        {
+            if (!File.Exists(baseParamZip))
+                throw new FileNotFoundException("Bundled NSC parameter baseline is missing.", baseParamZip);
+            progress("Merging character/stage XFBIN parameters...");
+            paramOutput = new LegacyParamCompiler().Compile(enabled, baseParamZip, moddingApiPayloadZip, workRoot, result, progress);
+        }
+        else if (result.ParameterXfbinsDetected > 0)
+        {
+            result.Warnings.Add("Parameter XFBINs were detected but no character_config.ini/stage_config.ini exists, so semantic ownership could not be determined safely.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
         progress("Preparing shader merge...");
         string generated = Path.Combine(workRoot, "generated");
         Directory.CreateDirectory(generated);
@@ -81,6 +97,16 @@ public sealed class AndroidCompiler
 
         // Build every archive in app cache first. Nothing generated is copied into the game
         // until all native pack operations have succeeded.
+        string resourcesModManager = Path.Combine(workRoot, "resources_modmanager");
+        if (FileTree.HasFiles(resourcesModManager))
+        {
+            progress("Packing resources_modmanager.cpk (desktop compatibility payload)...");
+            string output = Path.Combine(generated, "resources_modmanager.cpk");
+            PackChecked(resourcesModManager, output);
+            WriteInfo(output + ".info", 0x1F);
+            result.CpkArchivesPacked++;
+        }
+
         if (FileTree.HasFiles(cpkAssets))
         {
             progress("Packing cpk_assets.cpk (ARM64 native)...");
@@ -99,24 +125,39 @@ public sealed class AndroidCompiler
             result.CpkArchivesPacked++;
         }
 
+        if (paramOutput is not null && FileTree.HasFiles(paramOutput.ParamFilesDirectory))
+        {
+            progress("Packing param_files.cpk (semantic XFBIN merge)...");
+            string output = Path.Combine(generated, "param_files.cpk");
+            PackChecked(paramOutput.ParamFilesDirectory, output);
+            WriteInfo(output + ".info", 0x22);
+            result.CpkArchivesPacked++;
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
         progress("Installing/updating ModdingAPI payload...");
         result.ModdingApiFilesInstalled = ModdingApiInstaller.Install(moddingApiPayloadZip, gamePath);
+        if (paramOutput is not null && Directory.Exists(paramOutput.ModdingApiParamDirectory))
+        {
+            string dstApi = Path.Combine(gamePath, "moddingapi", "param", "NSC");
+            Directory.CreateDirectory(dstApi);
+            foreach (string file in Directory.EnumerateFiles(paramOutput.ModdingApiParamDirectory, "*", SearchOption.TopDirectoryOnly))
+                File.Copy(file, Path.Combine(dstApi, Path.GetFileName(file)), true);
+        }
         progress("Installing generated files into game directory...");
         string baseGame = Path.Combine(gamePath, "moddingapi", "mods", "base_game");
         Directory.CreateDirectory(baseGame);
+        BackupGenerated(baseGame);
         DeleteGenerated(baseGame);
         foreach (string file in Directory.EnumerateFiles(generated, "*.cpk*", SearchOption.TopDirectoryOnly))
             File.Copy(file, Path.Combine(baseGame, Path.GetFileName(file)), true);
-        ShaderMerger.InstallMergedFile(gamePath, stagedShader);
 
-        if (result.ParameterXfbinsDetected > 0 || result.CharacterConfigsDetected > 0 || result.StageConfigsDetected > 0 || result.ModelConfigsDetected > 0)
+        if (paramOutput is not null && Directory.Exists(paramOutput.GameOverlayDirectory))
         {
-            result.Warnings.Add(
-                "Semantic parameter merge is intentionally deferred to Phase 2B. " +
-                "Parameter/roster/stage files were detected but were NOT installed as whole-file overrides. " +
-                "Any pre-existing param_files.cpk was left untouched for safety.");
+            progress("Installing roster/stage UI overlay...");
+            InstallOverlayWithBackup(paramOutput.GameOverlayDirectory, gamePath);
         }
+        ShaderMerger.InstallMergedFile(gamePath, stagedShader);
 
         result.ReportPath = WriteReport(gamePath, result, enabled);
         progress("Compile finished.");
@@ -134,6 +175,7 @@ public sealed class AndroidCompiler
             if (!XfbinPreflight.IsParameterXfbin(xfbin)) continue;
 
             result.ParameterXfbinsDetected++;
+            result.ParameterInputs.Add($"{mod.Name}: {Path.GetRelativePath(mod.RootPath, xfbin)}");
             if (!XfbinPreflight.TryReadHeader(xfbin, out _, out string error))
                 result.Warnings.Add($"Invalid pending XFBIN '{Path.GetFileName(xfbin)}' in {mod.Name}: {error}");
         }
@@ -149,18 +191,55 @@ public sealed class AndroidCompiler
 
     private static void DeleteGenerated(string baseGame)
     {
-        // Phase 2A only owns these two generated archives. Keep any pre-existing
-        // resources_modmanager.cpk / param_files.cpk untouched until Phase 2B can
-        // regenerate them safely.
+        // Phase 2B owns all four generated archives below. Existing copies are
+        // backed up once before this cleanup, then replaced only after every
+        // staged archive has packed successfully.
         string[] names =
         {
+            "resources_modmanager.cpk", "resources_modmanager.cpk.info",
             "cpk_assets.cpk", "cpk_assets.cpk.info",
-            "data_win32_modmanager.cpk", "data_win32_modmanager.cpk.info"
+            "data_win32_modmanager.cpk", "data_win32_modmanager.cpk.info",
+            "param_files.cpk", "param_files.cpk.info"
         };
         foreach (string name in names)
         {
             string path = Path.Combine(baseGame, name);
             if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    private static void BackupGenerated(string baseGame)
+    {
+        string[] names =
+        {
+            "resources_modmanager.cpk", "resources_modmanager.cpk.info",
+            "cpk_assets.cpk", "cpk_assets.cpk.info",
+            "data_win32_modmanager.cpk", "data_win32_modmanager.cpk.info",
+            "param_files.cpk", "param_files.cpk.info"
+        };
+        foreach (string name in names)
+        {
+            string path = Path.Combine(baseGame, name);
+            string backup = path + ".nscmm_android.bak";
+            if (File.Exists(path) && !File.Exists(backup))
+                File.Copy(path, backup, false);
+        }
+    }
+
+    private static void InstallOverlayWithBackup(string overlayRoot, string gamePath)
+    {
+        string fullOverlay = Path.GetFullPath(overlayRoot);
+        foreach (string source in Directory.EnumerateFiles(fullOverlay, "*", SearchOption.AllDirectories))
+        {
+            string rel = Path.GetRelativePath(fullOverlay, source);
+            if (rel.StartsWith("..", StringComparison.Ordinal))
+                throw new InvalidDataException("Generated overlay escaped its staging directory.");
+            string destination = Path.Combine(gamePath, rel);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            string backup = destination + ".nscmm_android.bak";
+            if (File.Exists(destination) && !File.Exists(backup))
+                File.Copy(destination, backup, false);
+            File.Copy(source, destination, true);
         }
     }
 
@@ -173,7 +252,7 @@ public sealed class AndroidCompiler
         Directory.CreateDirectory(reportDir);
         string path = Path.Combine(reportDir, "nsc_android_compile_report.txt");
         var sb = new StringBuilder();
-        sb.AppendLine("NSC Mod Manager Android — Phase 2 compile report");
+        sb.AppendLine("NSC Mod Manager Android — Phase 2B semantic compile report");
         sb.AppendLine($"Time: {DateTime.Now:O}");
         sb.AppendLine($"Game: {gamePath}");
         sb.AppendLine($"Enabled mods: {result.EnabledMods}");
@@ -182,9 +261,20 @@ public sealed class AndroidCompiler
         sb.AppendLine($"CPKs read: {result.CpkArchivesRead}");
         sb.AppendLine($"CPKs generated: {result.CpkArchivesPacked}");
         sb.AppendLine($"Shaders merged: {result.ShaderFiles}");
-        sb.AppendLine($"Parameter XFBINs pending: {result.ParameterXfbinsDetected}");
-        sb.AppendLine($"Character configs pending: {result.CharacterConfigsDetected}");
-        sb.AppendLine($"Stage configs pending: {result.StageConfigsDetected}");
+        sb.AppendLine($"Parameter XFBIN inputs detected: {result.ParameterXfbinsDetected}");
+        sb.AppendLine($"Merged parameter XFBIN outputs: {result.ParameterXfbinsMerged}");
+        sb.AppendLine($"Character configs merged: {result.CharacterConfigsMerged}/{result.CharacterConfigsDetected}");
+        sb.AppendLine($"Stage configs merged: {result.StageConfigsMerged}/{result.StageConfigsDetected}");
+        sb.AppendLine($"Character UI files generated: {result.CharacterUiFilesGenerated}");
+        sb.AppendLine($"Stage UI files generated: {result.StageUiFilesGenerated}");
+        sb.AppendLine($"Stage preview/icon XFBINs generated: {result.StageResourceXfbinsGenerated}");
+        sb.AppendLine($"Desktop runtime overlay files generated: {result.FixedRuntimeFilesGenerated}");
+        sb.AppendLine($"Bundled base resource files staged: {result.BaseResourceFilesStaged}");
+        if (result.ParameterInputs.Count > 0)
+        {
+            sb.AppendLine("Parameter inputs:");
+            foreach (string input in result.ParameterInputs) sb.AppendLine("  - " + input);
+        }
         sb.AppendLine($"Model configs pending: {result.ModelConfigsDetected}");
         sb.AppendLine();
         sb.AppendLine("Warnings:");
