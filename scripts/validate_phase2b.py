@@ -51,6 +51,12 @@ for token, why in forbidden.items():
     if re.search(r'\b' + re.escape(token) + r'\b', all_cs):
         errors.append(f'forbidden Android dependency {token}: {why}')
 
+# 2c) Character-select icon previews are WPF editor metadata. Android semantic
+# compilation must never perform executable-side preview PNG I/O.
+charsel_model = (ROOT / 'Legacy' / 'Model' / 'CharacterSelectParamModel.cs').read_text(encoding='utf-8-sig', errors='ignore')
+if 'File.ReadAllBytes' in charsel_model and 'charsel_icons' in charsel_model:
+    errors.append('legacy character-select preview PNG I/O leaked into Android compiler')
+
 # 3) Validate bundled compiler baselines. A missing entry would only fail at
 # runtime on the phone, so fail the CI earlier here.
 param_zip = ROOT / 'Assets' / 'Payload' / 'nsc_param_base.zip'

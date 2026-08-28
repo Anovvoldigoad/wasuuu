@@ -566,7 +566,7 @@ namespace NSC_Toolbox.ViewModel {
                         CSP_entry.CostumeDescription = BinaryReader.b_ReadString(FileBytes, ptr + 0x18 + BinaryReader.b_ReadInt(FileBytes, ptr + 0x18));
                         CSP_entry.Accessory = BinaryReader.b_ReadString(FileBytes, ptr + 0x20 + BinaryReader.b_ReadInt(FileBytes, ptr + 0x20));
                         CSP_entry.CharselAnimation = BinaryReader.b_ReadString(FileBytes, ptr + 0x28 + BinaryReader.b_ReadInt(FileBytes, ptr + 0x28));
-                        CSP_entry.CharacterIconPath = AppDomain.CurrentDomain.BaseDirectory.ToString() + "\\Resources\\Styles\\UI\\charsel_icons\\" + CSP_entry.CSP_code + ".png";
+                        CSP_entry.CharacterIconPath = string.Empty; // Android: desktop preview asset intentionally disabled.
                         CSP_entry.SaveInFile = saveIn;
 
                         CharacterRosterPositionModel RosterEntry = new CharacterRosterPositionModel();
@@ -616,25 +616,8 @@ namespace NSC_Toolbox.ViewModel {
                         CSP_entry.CharselValues = RosterEntry;
                         CharacterSelectParamList.Add(CSP_entry);
                     }
-                    foreach(var entry in CharacterSelectParamList)
-                    {
-                        if (entry.CostumeIndex != 0)
-                        {
-                            var baseEntry = CharacterSelectParamList.FirstOrDefault(e =>
-                                e.PageIndex == entry.PageIndex &&
-                                e.SlotIndex == entry.SlotIndex &&
-                                e.CostumeIndex == 1);
+                    // Android: roster icon fallback is UI-only and intentionally skipped.
 
-                            if (!File.Exists(entry.CharacterIconPath) && baseEntry != null)
-                            {
-                                entry.CharacterIconPath =
-                                    AppDomain.CurrentDomain.BaseDirectory +
-                                    "\\Resources\\Styles\\UI\\charsel_icons\\" +
-                                    baseEntry.CSP_code +
-                                    ".png";
-                            }
-                        }
-                    }
                 } else {
                     ModernWpf.MessageBox.Show((string)System.Windows.Application.Current.Resources["m_error_1"]);
                     return;

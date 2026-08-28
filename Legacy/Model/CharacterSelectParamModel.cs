@@ -110,27 +110,19 @@ namespace NSC_ModManager.Model {
             }
         }
 
-        private string _characterIconPath;
+        private string _characterIconPath = string.Empty;
         public string CharacterIconPath {
             get {
                 return _characterIconPath;
             }
             set {
-                _characterIconPath = value;
-
-                MemoryStream memoryStream = new MemoryStream();
-
-
-                byte[] fileBytes = new byte[0];
-
-                if (File.Exists(value)) {
-                    fileBytes = File.ReadAllBytes(value);
-                } else {
-                    fileBytes = File.ReadAllBytes(AppDomain.CurrentDomain.BaseDirectory.ToString() + "\\Resources\\Styles\\UI\\charsel_icons\\pt_brank_emp.png");
-                }
-                memoryStream.Write(fileBytes, 0, fileBytes.Length);
-                memoryStream.Position = 0;
-                CharacterIconPreview = BitmapFrame.Create(memoryStream);
+                // Android compiler path: this property is legacy WPF preview metadata only.
+                // The desktop editor loaded a roster PNG here (and a fallback
+                // pt_brank_emp.png). Those UI assets are not required to parse, merge,
+                // or serialize characterSelectParam, and they are not shipped as loose
+                // files beside the Android executable. Keep the metadata but perform no
+                // filesystem/image I/O.
+                _characterIconPath = value ?? string.Empty;
                 OnPropertyChanged("CharacterIconPath");
             }
         }

@@ -316,7 +316,7 @@ public sealed class MainActivity : Activity
             File.WriteAllText(path,
                 "NSC Mod Manager Android — Phase 2B last compile error" + System.Environment.NewLine +
                 "Time: " + DateTime.Now.ToString("O") + System.Environment.NewLine +
-                "App: 0.3.3" + System.Environment.NewLine +
+                "App: 0.3.4" + System.Environment.NewLine +
                 "Game: " + game + System.Environment.NewLine + System.Environment.NewLine +
                 ex.ToString());
             return path;
