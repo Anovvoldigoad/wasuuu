@@ -34,6 +34,7 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
+        WinlatorEntry.Trace("MainForm: constructor entered");
         Text = "NSC Mod Manager 2.1.1.0 - Winlator Edition";
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(850, 600);
@@ -42,7 +43,9 @@ public sealed class MainForm : Form
         // Avoid Wine ARM64EC DPI-hosting paths; scale the whole utility window externally instead.
         AutoScaleMode = AutoScaleMode.None;
 
+        WinlatorEntry.Trace("MainForm: BuildUi begin");
         BuildUi();
+        WinlatorEntry.Trace("MainForm: BuildUi complete");
 
         UiBridge.Message += AppendLog;
         WinlatorEntry.Trace("MainForm: UI built; constructing TitleViewModel");
@@ -61,6 +64,19 @@ public sealed class MainForm : Form
         _stateTimer.Tick += (_, _) => UpdateBusyState();
         _stateTimer.Start();
 
+        Shown += (_, _) =>
+        {
+            try
+            {
+                System.Windows.Application.Current.Dispatcher.BindToControl(this);
+                WinlatorEntry.Trace("MainForm: dispatcher bound to visible MainForm handle");
+            }
+            catch (Exception ex)
+            {
+                WinlatorEntry.Trace("MainForm: dispatcher bind failed: " + ex);
+            }
+        };
+
         FormClosed += (_, _) =>
         {
             SaveUiSettings();
@@ -70,6 +86,7 @@ public sealed class MainForm : Form
 
     private void BuildUi()
     {
+        WinlatorEntry.Trace("MainForm.BuildUi: root layout");
         var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
@@ -84,6 +101,7 @@ public sealed class MainForm : Form
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         Controls.Add(root);
 
+        WinlatorEntry.Trace("MainForm.BuildUi: paths controls");
         var paths = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 4, Padding = new Padding(0, 0, 0, 8) };
         paths.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         paths.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -117,6 +135,7 @@ public sealed class MainForm : Form
         paths.Controls.Add(refresh, 3, 2);
         root.Controls.Add(paths, 0, 0);
 
+        WinlatorEntry.Trace("MainForm.BuildUi: action controls");
         var actions = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(0, 0, 0, 8) };
         _install.Text = "Install Mod";
         _install.AutoSize = true;
@@ -148,6 +167,7 @@ public sealed class MainForm : Form
         actions.Controls.AddRange(new Control[] { _install, _delete, _compile, _clean, _api, _enabled, _launchAfterCompile });
         root.Controls.Add(actions, 0, 1);
 
+        WinlatorEntry.Trace("MainForm.BuildUi: mod list");
         _mods.Dock = DockStyle.Fill;
         _mods.View = System.Windows.Forms.View.Details;
         _mods.FullRowSelect = true;
@@ -167,6 +187,7 @@ public sealed class MainForm : Form
         };
         root.Controls.Add(_mods, 0, 2);
 
+        WinlatorEntry.Trace("MainForm.BuildUi: log/status controls");
         var logBox = new GroupBox { Text = "Status / log", Dock = DockStyle.Fill, Padding = new Padding(8) };
         _log.Dock = DockStyle.Fill;
         _log.Multiline = true;
@@ -190,6 +211,7 @@ public sealed class MainForm : Form
         root.Controls.Add(statusPanel, 0, 4);
 
         _game.SelectedIndexChanged += (_, _) => ChangeGame();
+        WinlatorEntry.Trace("MainForm.BuildUi: complete");
     }
 
     private bool IsStorm4 => _game.SelectedIndex == 1;

@@ -42,6 +42,13 @@ internal static class WinlatorEntry
 
         try
         {
+            // Do not let WinForms auto-create WindowsFormsSynchronizationContext.
+            // On some Wine ARM64EC builds that hidden marshaling window kills X11
+            // before MainForm is constructed. CompatDispatcher uses Control.Invoke
+            // after MainForm is shown instead.
+            System.Windows.Forms.WindowsFormsSynchronizationContext.AutoInstall = false;
+            Trace("WindowsFormsSynchronizationContext.AutoInstall=false");
+
             Trace("Calling SetHighDpiMode(DpiUnaware)");
             Application.SetHighDpiMode(HighDpiMode.DpiUnaware);
             Trace("SetHighDpiMode complete");
@@ -52,7 +59,7 @@ internal static class WinlatorEntry
             Trace("SetCompatibleTextRenderingDefault complete");
 
             System.Windows.Application.Current.Dispatcher.BindToCurrentThread();
-            Trace("Compat dispatcher bound");
+            Trace("Compat dispatcher recorded UI thread (no hidden sync window)");
 
             if (!File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "YACpkTool.exe")))
                 Trace("WARNING: YACpkTool.exe is missing; CPK operations will fail.");

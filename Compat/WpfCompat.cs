@@ -30,47 +30,64 @@ namespace System.Windows
 
     public sealed class CompatDispatcher
     {
-        private SynchronizationContext? _context;
+        // IMPORTANT FOR WINE/WINLATOR:
+        // Do not create WindowsFormsSynchronizationContext here. Its constructor
+        // creates a hidden marshaling control/window, which crashes some ARM64EC
+        // Wine builds before the main form is even created.
+        private WinForms.Control? _uiControl;
         private int _threadId;
 
         public void BindToCurrentThread()
         {
             _threadId = Environment.CurrentManagedThreadId;
-            _context = SynchronizationContext.Current ?? new WinForms.WindowsFormsSynchronizationContext();
         }
 
-        public bool CheckAccess() => _threadId == 0 || Environment.CurrentManagedThreadId == _threadId;
+        public void BindToControl(WinForms.Control control)
+        {
+            _uiControl = control ?? throw new ArgumentNullException(nameof(control));
+            _threadId = Environment.CurrentManagedThreadId;
+        }
+
+        public bool CheckAccess()
+        {
+            if (_uiControl is { IsDisposed: false, IsHandleCreated: true })
+                return !_uiControl.InvokeRequired;
+            return _threadId == 0 || Environment.CurrentManagedThreadId == _threadId;
+        }
 
         public void Invoke(Action action)
         {
             if (action is null) return;
-            if (_context is null || CheckAccess())
+
+            var control = _uiControl;
+            if (control is { IsDisposed: false, IsHandleCreated: true })
             {
-                action();
+                if (control.InvokeRequired)
+                    control.Invoke(action);
+                else
+                    action();
                 return;
             }
 
-            Exception? captured = null;
-            _context.Send(_ =>
-            {
-                try { action(); } catch (Exception ex) { captured = ex; }
-            }, null);
-            if (captured is not null) throw captured;
+            // Before the main form has a handle there is nothing safe to marshal
+            // through. Startup work runs on the UI thread, so direct invocation is
+            // correct here and avoids creating any hidden Wine window.
+            action();
         }
 
         public T Invoke<T>(Func<T> action)
         {
             if (action is null) throw new ArgumentNullException(nameof(action));
-            if (_context is null || CheckAccess()) return action();
 
-            T result = default!;
-            Exception? captured = null;
-            _context.Send(_ =>
+            var control = _uiControl;
+            if (control is { IsDisposed: false, IsHandleCreated: true })
             {
-                try { result = action(); } catch (Exception ex) { captured = ex; }
-            }, null);
-            if (captured is not null) throw captured;
-            return result;
+                if (control.InvokeRequired)
+                    return (T)control.Invoke(action)!;
+                return action();
+            }
+
+            return action();
         }
     }
 
