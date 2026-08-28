@@ -92,7 +92,8 @@ public sealed class MainActivity : Activity
         cpk.AddView(Button("CPK Self-Test", (_, _) => CpkSelfTest()));
         root.AddView(cpk);
 
-        _status = new TextView(this) { Text = "Ready", TextIsSelectable = true };
+        _status = new TextView(this) { Text = "Ready" };
+        _status.SetTextIsSelectable(true);
         root.AddView(_status);
         SetContentView(scroll);
     }
@@ -166,7 +167,7 @@ public sealed class MainActivity : Activity
         using ICursor? cursor = ContentResolver?.Query(uri, null, null, null, null);
         if (cursor is not null && cursor.MoveToFirst())
         {
-            int idx = cursor.GetColumnIndex(OpenableColumns.DisplayName);
+            int idx = cursor.GetColumnIndex(Android.Provider.IOpenableColumns.DisplayName);
             if (idx >= 0) return cursor.GetString(idx);
         }
         return uri.LastPathSegment;
