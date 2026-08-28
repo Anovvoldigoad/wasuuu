@@ -794,7 +794,7 @@ namespace NSC_ModManager.ViewModel
         public void OpenFile(string basepath = "") {
             Clear();
             if (basepath == "") {
-                OpenFileDialog myDialog = new OpenFileDialog();
+                Microsoft.Win32.OpenFileDialog myDialog = new Microsoft.Win32.OpenFileDialog();
                 myDialog.Filter = "XFBIN Container (*.xfbin)|*.xfbin";
                 myDialog.CheckFileExists = true;
                 myDialog.Multiselect = false;
@@ -1377,8 +1377,8 @@ namespace NSC_ModManager.ViewModel
         }
         public void PastePLANMEntry() {
             if (SelectedVer is not null) {
-                if (Clipboard.GetText() != "" || Clipboard.GetText().Length < 0xD4) {
-                    byte[] binaryData = BinaryReader.b_StringToBytes(Clipboard.GetText());
+                if (System.Windows.Clipboard.GetText() != "" || System.Windows.Clipboard.GetText().Length < 0xD4) {
+                    byte[] binaryData = BinaryReader.b_StringToBytes(System.Windows.Clipboard.GetText());
                     int plAnmStartOffset = 0x00;
                     PRM_PL_ANM_Model planm_entry = new PRM_PL_ANM_Model();
                     planm_entry.PL_ANM_current_name = BinaryReader.b_ReadString(binaryData, plAnmStartOffset);
@@ -1523,7 +1523,7 @@ namespace NSC_ModManager.ViewModel
                 for (int i = 0; i < copyBytes.Length; i++) {
                     convertedCode = convertedCode + " " + copyBytes[i].ToString("X2");
                 }
-                Clipboard.SetText(convertedCode.Substring(1, convertedCode.Length - 1));
+                System.Windows.Clipboard.SetText(convertedCode.Substring(1, convertedCode.Length - 1));
                 ModernWpf.MessageBox.Show("PL_ANM entry was copied successfully!");
 
             } else {
@@ -1595,8 +1595,8 @@ namespace NSC_ModManager.ViewModel
         }
         public void PasteFunctionEntry() {
             if (SelectedVer is not null && SelectedPL_ANM is not null) {
-                if (Clipboard.GetText() != "" || Clipboard.GetText().Length < 0x40) {
-                    byte[] binaryData = BinaryReader.b_StringToBytes(Clipboard.GetText());
+                if (System.Windows.Clipboard.GetText() != "" || System.Windows.Clipboard.GetText().Length < 0x40) {
+                    byte[] binaryData = BinaryReader.b_StringToBytes(System.Windows.Clipboard.GetText());
                     int plAnmStartOffset = 0x00;
                     string check_dmg = BinaryReader.b_ReadString(binaryData, plAnmStartOffset + 0x40);
                     bool dmg_entry = false;
@@ -1687,7 +1687,7 @@ namespace NSC_ModManager.ViewModel
                 for (int i = 0; i < copyBytes.Length; i++) {
                     convertedCode = convertedCode + " " + copyBytes[i].ToString("X2");
                 }
-                Clipboard.SetText(convertedCode.Substring(1, convertedCode.Length - 1));
+                System.Windows.Clipboard.SetText(convertedCode.Substring(1, convertedCode.Length - 1));
                 ModernWpf.MessageBox.Show("Function entry was copied successfully!");
 
             } else {
@@ -1713,7 +1713,7 @@ namespace NSC_ModManager.ViewModel
 
         public void SaveFileAs(string basepath = "") {
             if (VerList.Count > 0) {
-                SaveFileDialog s = new SaveFileDialog();
+                Microsoft.Win32.SaveFileDialog s = new Microsoft.Win32.SaveFileDialog();
                 {
                     s.DefaultExt = ".xfbin";
                     s.Filter = "*.xfbin|*.xfbin";

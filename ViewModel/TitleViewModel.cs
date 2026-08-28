@@ -1476,7 +1476,7 @@ namespace NSC_ModManager.ViewModel
 
             try
             {
-                //MessageBox.Show(CharacterList[-1].Characode);
+                //System.Windows.MessageBox.Show(CharacterList[-1].Characode);
                 LoadingStatePlay = Visibility.Visible;
                 RefreshModList();
                 bw.WorkerReportsProgress = true;
@@ -1486,7 +1486,7 @@ namespace NSC_ModManager.ViewModel
 
                 } else
                 {
-                    MessageBox.Show("Wait till compiling process is finished!");
+                    System.Windows.MessageBox.Show("Wait till compiling process is finished!");
                 }
 
             } catch (Exception ex)
@@ -1771,14 +1771,14 @@ namespace NSC_ModManager.ViewModel
                             !File.Exists(cmnparamModPath) ||
                             !File.Exists(characterSelectParamModPath))
                             {
-                                MessageBox.Show("Missing Param files");
+                                System.Windows.MessageBox.Show("Missing Param files");
                                 continue;
                             }
                         } else
                         {
                             if (!File.Exists(duelPlayerParamModPath))
                             {
-                                MessageBox.Show("Missing DuelPlayerParam file for partner");
+                                System.Windows.MessageBox.Show("Missing DuelPlayerParam file for partner");
                                 continue;
                             }
                         }
@@ -3994,7 +3994,7 @@ namespace NSC_ModManager.ViewModel
                         c.CharacodeName.Equals(specialInteractionEntry.MainCharacode, StringComparison.OrdinalIgnoreCase));
                     if (mainEntry == null)
                     {
-                        MessageBox.Show($"Main character '{specialInteractionEntry.MainCharacode}' not found in characode_vanilla.");
+                        System.Windows.MessageBox.Show($"Main character '{specialInteractionEntry.MainCharacode}' not found in characode_vanilla.");
                         continue;
                     }
                     int mainCharIndex = mainEntry.CharacodeIndex;
@@ -4011,7 +4011,7 @@ namespace NSC_ModManager.ViewModel
                             c.CharacodeName.Equals(triggerName, StringComparison.OrdinalIgnoreCase));
                         if (triggerEntry == null)
                         {
-                            MessageBox.Show($"Trigger character '{triggerName}' not found in characode_vanilla.");
+                            System.Windows.MessageBox.Show($"Trigger character '{triggerName}' not found in characode_vanilla.");
                             continue;
                         }
                         newEntry.TriggerList.Add(triggerEntry.CharacodeIndex);
@@ -4651,7 +4651,7 @@ namespace NSC_ModManager.ViewModel
                 {
                     string message = "Unable to find characodes for Team Ultimate Jutsus. These Team Ultimate Jutsus were skipped:\n" +
                                      string.Join("\n", skippedLabels);
-                    MessageBox.Show(message);
+                    System.Windows.MessageBox.Show(message);
                 }
             } catch (Exception ex)
             {
@@ -4924,14 +4924,14 @@ namespace NSC_ModManager.ViewModel
                             !File.Exists(cmnparamModPath) ||
                             !File.Exists(characterSelectParamModPath))
                             {
-                                MessageBox.Show("Error 1");
+                                System.Windows.MessageBox.Show("Error 1");
                                 continue;
                             }
                         } else
                         {
                             if (!File.Exists(duelPlayerParamModPath))
                             {
-                                MessageBox.Show("Error 2");
+                                System.Windows.MessageBox.Show("Error 2");
                                 continue;
                             }
                         }
@@ -7005,7 +7005,7 @@ namespace NSC_ModManager.ViewModel
                         c.CharacodeName.Equals(specialInteractionEntry.MainCharacode, StringComparison.OrdinalIgnoreCase));
                     if (mainEntry == null)
                     {
-                        MessageBox.Show($"Main character '{specialInteractionEntry.MainCharacode}' not found in characode_vanilla.");
+                        System.Windows.MessageBox.Show($"Main character '{specialInteractionEntry.MainCharacode}' not found in characode_vanilla.");
                         continue;
                     }
                     int mainCharIndex = mainEntry.CharacodeIndex;
@@ -7022,7 +7022,7 @@ namespace NSC_ModManager.ViewModel
                             c.CharacodeName.Equals(triggerName, StringComparison.OrdinalIgnoreCase));
                         if (triggerEntry == null)
                         {
-                            MessageBox.Show($"Trigger character '{triggerName}' not found in characode_vanilla.");
+                            System.Windows.MessageBox.Show($"Trigger character '{triggerName}' not found in characode_vanilla.");
                             continue;
                         }
                         newEntry.TriggerList.Add(triggerEntry.CharacodeIndex);
@@ -7642,7 +7642,7 @@ namespace NSC_ModManager.ViewModel
                 {
                     string message = "Unable to find characodes for Team Ultimate Jutsus. These Team Ultimate Jutsus were skipped:\n" +
                                      string.Join("\n", skippedLabels);
-                    MessageBox.Show(message);
+                    System.Windows.MessageBox.Show(message);
                 }
             } catch (Exception ex)
             {
@@ -7726,7 +7726,7 @@ namespace NSC_ModManager.ViewModel
             {
                 if (string.IsNullOrEmpty(mod_path))
                 {
-                    OpenFileDialog myDialog = new OpenFileDialog();
+                    Microsoft.Win32.OpenFileDialog myDialog = new Microsoft.Win32.OpenFileDialog();
 
                     myDialog.Filter = "Naruto Storm Mod|*.uns;*.unse;*.nsc;*.ensc;|Old Naruto Storm 4 Mod|*.nus4";
                     myDialog.CheckFileExists = true;
@@ -8449,7 +8449,7 @@ namespace NSC_ModManager.ViewModel
         }
         public void SelectImageBackground()
         {
-            OpenFileDialog myDialog = new OpenFileDialog();
+            Microsoft.Win32.OpenFileDialog myDialog = new Microsoft.Win32.OpenFileDialog();
             myDialog.Filter = "PNG Image (*.png)|*.png|JPG Image (*.jpg)|*.jpg|JPEG Image (*.jpeg)|*.jpeg";
             myDialog.CheckFileExists = true;
             myDialog.Multiselect = false;

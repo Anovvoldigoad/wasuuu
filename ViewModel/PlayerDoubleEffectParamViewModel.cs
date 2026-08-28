@@ -227,7 +227,7 @@ namespace NSC_ModManager.ViewModel
         public void OpenFile(string basepath = "") {
             Clear();
             if (basepath == "") {
-                OpenFileDialog myDialog = new OpenFileDialog();
+                Microsoft.Win32.OpenFileDialog myDialog = new Microsoft.Win32.OpenFileDialog();
                 myDialog.Filter = "XFBIN Container (*.xfbin)|*.xfbin";
                 myDialog.CheckFileExists = true;
                 myDialog.Multiselect = false;
@@ -390,7 +390,7 @@ namespace NSC_ModManager.ViewModel
         }
 
         public void SaveFileAs(string basepath = "") {
-            SaveFileDialog s = new SaveFileDialog();
+            Microsoft.Win32.SaveFileDialog s = new Microsoft.Win32.SaveFileDialog();
             {
                 s.DefaultExt = ".xfbin";
                 s.Filter = "*.xfbin|*.xfbin";

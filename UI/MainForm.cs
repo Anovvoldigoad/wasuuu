@@ -146,7 +146,7 @@ public sealed class MainForm : Form
         root.Controls.Add(actions, 0, 1);
 
         _mods.Dock = DockStyle.Fill;
-        _mods.View = View.Details;
+        _mods.View = System.Windows.Forms.View.Details;
         _mods.FullRowSelect = true;
         _mods.HideSelection = false;
         _mods.MultiSelect = false;

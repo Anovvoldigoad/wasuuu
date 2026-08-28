@@ -410,14 +410,14 @@ namespace NSC_Toolbox.ViewModel
                         }
                         MessageInfo_preview_List = MessageInfo_List[SelectedMessageInfoIndex];
                     } else {
-                        MessageBox.Show((string)System.Windows.Application.Current.Resources["m_error_39"]);
+                        System.Windows.MessageBox.Show((string)System.Windows.Application.Current.Resources["m_error_39"]);
                         LoadingStatePlay = Visibility.Hidden;
                         return;
                     }
                 }
             }
             catch (Exception ex) {
-                MessageBox.Show(ex.StackTrace + "\n\n" + ex.Message);
+                System.Windows.MessageBox.Show(ex.StackTrace + "\n\n" + ex.Message);
             }
             
         }
@@ -483,7 +483,7 @@ namespace NSC_Toolbox.ViewModel
                 CollectionViewSource.GetDefaultView(MessageInfo_preview_List).MoveCurrentTo(SelectedMessageInfo);
                 ModernWpf.MessageBox.Show((string)System.Windows.Application.Current.Resources["m_tool_2"]);
             } catch (Exception ex) {
-                MessageBox.Show(ex.StackTrace + "\n\n" + ex.Message);
+                System.Windows.MessageBox.Show(ex.StackTrace + "\n\n" + ex.Message);
             }
         }
         public void DupEntries() {
@@ -499,7 +499,7 @@ namespace NSC_Toolbox.ViewModel
                     ModernWpf.MessageBox.Show((string)System.Windows.Application.Current.Resources["m_tool_2"]);
                 }
             } catch (Exception ex) {
-                MessageBox.Show(ex.StackTrace + "\n\n" + ex.Message);
+                System.Windows.MessageBox.Show(ex.StackTrace + "\n\n" + ex.Message);
             }
         }
         public void DeleteEntries() {
@@ -513,7 +513,7 @@ namespace NSC_Toolbox.ViewModel
                     ModernWpf.MessageBox.Show((string)System.Windows.Application.Current.Resources["m_tool_2"]);
                 }
             } catch (Exception ex) {
-                MessageBox.Show(ex.StackTrace + "\n\n" + ex.Message);
+                System.Windows.MessageBox.Show(ex.StackTrace + "\n\n" + ex.Message);
             }
         }
         public int SearchStringIndex(ObservableCollection<MessageInfoModel> FunctionList, string member_name, int Selected) {
@@ -545,7 +545,7 @@ namespace NSC_Toolbox.ViewModel
                 }
                 }
             } catch (Exception ex) {
-                MessageBox.Show(ex.StackTrace + "\n\n" + ex.Message);
+                System.Windows.MessageBox.Show(ex.StackTrace + "\n\n" + ex.Message);
             }
         }
         public void SearchCRC32Entry() {
@@ -566,7 +566,7 @@ namespace NSC_Toolbox.ViewModel
                     }
                 }
             } catch (Exception ex) {
-                MessageBox.Show(ex.StackTrace + "\n\n" + ex.Message);
+                System.Windows.MessageBox.Show(ex.StackTrace + "\n\n" + ex.Message);
             }
         }
         public void SaveEntries() {
@@ -670,7 +670,7 @@ namespace NSC_Toolbox.ViewModel
                     ModernWpf.MessageBox.Show((string)System.Windows.Application.Current.Resources["m_tool_1"]);
                 }
             } catch (Exception ex) {
-                MessageBox.Show(ex.StackTrace + "\n\n" + ex.Message);
+                System.Windows.MessageBox.Show(ex.StackTrace + "\n\n" + ex.Message);
             }
         }
 
@@ -697,7 +697,7 @@ namespace NSC_Toolbox.ViewModel
                     File.WriteAllBytes(file_path, ConvertToFile(i));
                 }
             } catch (Exception ex) {
-                MessageBox.Show(ex.StackTrace + "\n\n" + ex.Message);
+                System.Windows.MessageBox.Show(ex.StackTrace + "\n\n" + ex.Message);
             }
 
         }
@@ -968,7 +968,7 @@ namespace NSC_Toolbox.ViewModel
                     0
                 });
             } catch (Exception ex) {
-                MessageBox.Show(ex.StackTrace + "\n\n" + ex.Message);
+                System.Windows.MessageBox.Show(ex.StackTrace + "\n\n" + ex.Message);
             }
             return fileBytes36;
         }

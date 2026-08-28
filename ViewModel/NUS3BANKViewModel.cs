@@ -1004,7 +1004,7 @@ namespace NSC_ModManager.ViewModel
             Clear();
             if (basepath == "")
             {
-                OpenFileDialog myDialog = new OpenFileDialog();
+                Microsoft.Win32.OpenFileDialog myDialog = new Microsoft.Win32.OpenFileDialog();
                 myDialog.Filter = "XFBIN Container (*.xfbin)|*.xfbin";
                 myDialog.CheckFileExists = true;
                 myDialog.Multiselect = false;
@@ -1311,7 +1311,7 @@ namespace NSC_ModManager.ViewModel
                     DTONList = NUS3BANK_FILE.DTON_DATA.Entries;
 
 
-                    //MessageBox.Show(S_XFBIN_READER.GetChunkNameByMapIndex((int)SoundChunk.ChunkMapIndex));
+                    //System.Windows.MessageBox.Show(S_XFBIN_READER.GetChunkNameByMapIndex((int)SoundChunk.ChunkMapIndex));
                 } else
                     ModernWpf.MessageBox.Show((string)System.Windows.Application.Current.Resources["m_nus3bankEditor_error_1"]);
             }
@@ -1380,7 +1380,7 @@ namespace NSC_ModManager.ViewModel
                 
             } catch (Exception ex)
             {
-                MessageBox.Show(ex.StackTrace + "\n\n" + ex.Message);
+                System.Windows.MessageBox.Show(ex.StackTrace + "\n\n" + ex.Message);
             }
 
         }
@@ -1427,14 +1427,14 @@ namespace NSC_ModManager.ViewModel
                     } catch (Exception exTone)
                     {
                         // log per-tone error and continue (optionally show message)
-                        // MessageBox.Show($"Failed to extract {tone?.Name}: {exTone.Message}");
+                        // System.Windows.MessageBox.Show($"Failed to extract {tone?.Name}: {exTone.Message}");
                     }
                 }
                 // optional: notify finished on UI thread
-                System.Windows.Application.Current.Dispatcher.Invoke(() => MessageBox.Show("Export finished."));
+                System.Windows.Application.Current.Dispatcher.Invoke(() => System.Windows.MessageBox.Show("Export finished."));
             } catch (Exception ex)
             {
-                System.Windows.Application.Current.Dispatcher.Invoke(() => MessageBox.Show(ex.StackTrace + "\n\n" + ex.Message));
+                System.Windows.Application.Current.Dispatcher.Invoke(() => System.Windows.MessageBox.Show(ex.StackTrace + "\n\n" + ex.Message));
             }
         }
         public async void ExtractAllWavCommandExecute(bool ExtractWithIndex = false)
@@ -1499,7 +1499,7 @@ namespace NSC_ModManager.ViewModel
             }
             if (SelectedTone is not null)
             {
-                OpenFileDialog myDialog = new OpenFileDialog();
+                Microsoft.Win32.OpenFileDialog myDialog = new Microsoft.Win32.OpenFileDialog();
                 myDialog.Filter = "WAV (*.wav)|*.wav|Namco Bandai BNSF (*.bnsf)|*.bnsf";
                 myDialog.CheckFileExists = true;
                 myDialog.Multiselect = false;
@@ -1589,7 +1589,7 @@ namespace NSC_ModManager.ViewModel
             }
             if (SelectedTone is not null)
             {
-                OpenFileDialog myDialog = new OpenFileDialog();
+                Microsoft.Win32.OpenFileDialog myDialog = new Microsoft.Win32.OpenFileDialog();
                 myDialog.Filter = "WAV (*.wav)|*.wav";
                 myDialog.CheckFileExists = true;
                 myDialog.Multiselect = false;
@@ -1832,7 +1832,7 @@ namespace NSC_ModManager.ViewModel
                 return;
 
             }
-            OpenFileDialog dlg = new OpenFileDialog
+            Microsoft.Win32.OpenFileDialog dlg = new Microsoft.Win32.OpenFileDialog
             {
                 Filter = "WAV (*.wav)|*.wav|Namco Bandai BNSF (*.bnsf)|*.bnsf",
                 CheckFileExists = true,
@@ -2002,7 +2002,7 @@ namespace NSC_ModManager.ViewModel
                 return;
 
             }
-            OpenFileDialog dlg = new OpenFileDialog
+            Microsoft.Win32.OpenFileDialog dlg = new Microsoft.Win32.OpenFileDialog
             {
                 Filter = "WAV (*.wav)|*.wav",
                 CheckFileExists = true,
@@ -2152,7 +2152,7 @@ namespace NSC_ModManager.ViewModel
         {
             if (NUS3BANK_FILE.PROP_DATA is not null)
             {
-                SaveFileDialog s = new SaveFileDialog();
+                Microsoft.Win32.SaveFileDialog s = new Microsoft.Win32.SaveFileDialog();
                 {
                     s.DefaultExt = ".xfbin";
                     s.Filter = "*.xfbin|*.xfbin";

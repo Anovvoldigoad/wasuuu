@@ -156,7 +156,7 @@ namespace NSC_ModManager.Properties
 
                 cpkMaker.WaitForComplete();
 
-                MessageBox.Show(save_directory);
+                System.Windows.MessageBox.Show(save_directory);
                 // ----- здесь добавляем шифрование/дешифрование всего .cpk -----
             } catch (Exception ex)
             {
@@ -179,7 +179,7 @@ namespace NSC_ModManager.Properties
                 // Optional: handle log write errors if needed
             }
 
-            Application.Current.Dispatcher.Invoke(() =>
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
             {
                 SystemSounds.Exclamation.Play();
                 ModernWpf.MessageBox.Show($"Error: {ex.Message}\n\n{ex.StackTrace}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);

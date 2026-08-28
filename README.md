@@ -1,3 +1,8 @@
+
+## Phase 2.1 build fix
+
+The first real GitHub Actions compile exposed namespace collisions between the legacy WPF-compatible API names and WinForms implicit imports. Phase 2.1 explicitly qualifies those APIs and pins the CI build to .NET SDK 8.0.424. See `BUILD_FIX_2_1.md`.
+
 # NSC Mod Manager 2.1.1.0 - Winlator Edition (Phase 2)
 
 This is a compatibility port of TheLeonX/NSC-ModManager 2.1.1.0 aimed at Wine/Winlator/GameHub.
