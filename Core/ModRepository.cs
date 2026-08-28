@@ -6,11 +6,13 @@ public sealed class ModRepository
     {
         if (string.IsNullOrWhiteSpace(modsFolder) || !Directory.Exists(modsFolder))
             return Array.Empty<ModInfo>();
+
         var result = new List<ModInfo>();
-        foreach (string dir in Directory.EnumerateDirectories(modsFolder))
+        foreach (string iniPath in Directory.EnumerateFiles(modsFolder, "mod_config.ini", SearchOption.AllDirectories)
+                     .OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
         {
-            string iniPath = System.IO.Path.Combine(dir, "mod_config.ini");
-            if (!File.Exists(iniPath)) continue;
+            string? dir = Path.GetDirectoryName(iniPath);
+            if (string.IsNullOrEmpty(dir)) continue;
             try
             {
                 var ini = new IniFile(iniPath);
@@ -18,7 +20,7 @@ public sealed class ModRepository
                 result.Add(new ModInfo
                 {
                     RootPath = dir,
-                    Name = ini.Read("ModName", "ModManager", System.IO.Path.GetFileName(dir)),
+                    Name = ini.Read("ModName", "ModManager", Path.GetFileName(dir)),
                     Author = ini.Read("Author"),
                     Description = ini.Read("Description"),
                     Version = ini.Read("Version"),
@@ -27,9 +29,17 @@ public sealed class ModRepository
                     Enabled = !enabled.Equals("false", StringComparison.OrdinalIgnoreCase)
                 });
             }
-            catch { }
+            catch
+            {
+                // A broken config should not make the whole mod list unavailable.
+            }
         }
-        return result.OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase).ToArray();
+
+        return result
+            .GroupBy(x => Path.GetFullPath(x.RootPath), StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     public void SetEnabled(ModInfo mod, bool enabled)

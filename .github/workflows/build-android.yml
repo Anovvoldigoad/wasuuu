@@ -60,6 +60,19 @@ jobs:
           echo "Native libraries visible inside project:"
           find . -type f -name '*.so' -not -path './obj/*' -not -path './bin/*' -print
 
+      - name: Verify Phase 2 payload
+        shell: bash
+        run: |
+          test -s Assets/Payload/moddingapi_payload.zip
+          echo "Payload size:"
+          ls -lh Assets/Payload/moddingapi_payload.zip
+          SO_COUNT=$(find . -type f -name 'libcpkbridge.so' -not -path './obj/*' -not -path './bin/*' | wc -l)
+          if [ "$SO_COUNT" -ne 1 ]; then
+            echo "Expected exactly one libcpkbridge.so in project tree, got $SO_COUNT" >&2
+            find . -type f -name 'libcpkbridge.so' -print
+            exit 1
+          fi
+
       - name: Install Android SDK dependencies
         shell: bash
         run: |
@@ -70,6 +83,14 @@ jobs:
             -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" \
             -p:AcceptAndroidSdkLicenses=True
 
+      - name: Compile Android project (Release)
+        shell: bash
+        run: |
+          dotnet build NSC-ModManager.Android.csproj \
+            -c Release \
+            -f net10.0-android \
+            -r android-arm64
+
       - name: Build APK
         shell: bash
         run: |
@@ -79,16 +100,24 @@ jobs:
             -r android-arm64 \
             -p:AndroidPackageFormat=apk
 
-      - name: Collect APK
+      - name: Collect and verify signed APK
         shell: bash
         run: |
+          rm -rf artifact
           mkdir -p artifact
-          find bin/Release -type f -name '*.apk' -print -exec cp {} artifact/ \;
-          echo "Collected APKs:"
-          ls -lah artifact || true
-          test -n "$(find artifact -name '*.apk' -print -quit)"
+          SIGNED=$(find bin/Release -type f -name '*-Signed.apk' -print -quit)
+          if [ -z "$SIGNED" ]; then
+            echo "Signed APK was not produced." >&2
+            find bin/Release -type f -name '*.apk' -print
+            exit 1
+          fi
+          cp "$SIGNED" artifact/NSC-ModManager-Android-Phase2A-Signed.apk
+          echo "Verifying APK contents..."
+          unzip -l artifact/NSC-ModManager-Android-Phase2A-Signed.apk | grep -F 'lib/arm64-v8a/libcpkbridge.so'
+          unzip -l artifact/NSC-ModManager-Android-Phase2A-Signed.apk | grep -F 'assets/Payload/moddingapi_payload.zip'
+          ls -lah artifact
 
       - uses: actions/upload-artifact@v4
         with:
-          name: NSC-ModManager-Android-arm64-net10
+          name: NSC-ModManager-Android-Phase2A-arm64-net10
           path: artifact/*.apk
