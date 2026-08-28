@@ -92,8 +92,11 @@ public sealed class MainActivity : Activity
         actions.AddView(MakeButton("Delete", (_, _) => DeleteSelected()));
         root.AddView(actions);
 
+        var compilerActions = Row();
         _compileButton = MakeButton("Compile Mods", async (_, _) => await CompileModsAsync());
-        root.AddView(_compileButton);
+        compilerActions.AddView(_compileButton);
+        compilerActions.AddView(MakeButton("Install / Update ModdingAPI", (_, _) => InstallModdingApiOnly()));
+        root.AddView(compilerActions);
 
         var cpk = Row();
         cpk.AddView(MakeButton("CPK Pack + Extract Self-Test", (_, _) => CpkSelfTest()));
@@ -236,6 +239,25 @@ public sealed class MainActivity : Activity
                 catch (Exception ex) { SetStatus(ex.Message); }
             })
             .Show();
+    }
+
+
+    void InstallModdingApiOnly()
+    {
+        try
+        {
+            SaveGamePath();
+            var check = PathValidator.ValidateGamePath(_prefs.GamePath);
+            if (!check.Ok) { SetStatus(check.Message); return; }
+            if (!File.Exists(_payloadZip)) { SetStatus("Bundled ModdingAPI payload is missing from APK."); return; }
+
+            int count = ModdingApiInstaller.Install(_payloadZip, _prefs.GamePath);
+            SetStatus($"ModdingAPI installed/updated: {count} file(s).");
+        }
+        catch (Exception ex)
+        {
+            SetStatus("ModdingAPI install failed: " + ex.Message);
+        }
     }
 
     async Task CompileModsAsync()

@@ -111,13 +111,13 @@ jobs:
             find bin/Release -type f -name '*.apk' -print
             exit 1
           fi
-          cp "$SIGNED" artifact/NSC-ModManager-Android-Phase2A-Signed.apk
+          cp "$SIGNED" artifact/NSC-ModManager-Android-Phase2A.1-Signed.apk
           echo "Verifying APK contents..."
-          unzip -l artifact/NSC-ModManager-Android-Phase2A-Signed.apk | grep -F 'lib/arm64-v8a/libcpkbridge.so'
-          unzip -l artifact/NSC-ModManager-Android-Phase2A-Signed.apk | grep -F 'assets/Payload/moddingapi_payload.zip'
+          unzip -l artifact/NSC-ModManager-Android-Phase2A.1-Signed.apk | grep -F 'lib/arm64-v8a/libcpkbridge.so'
+          unzip -l artifact/NSC-ModManager-Android-Phase2A.1-Signed.apk | grep -F 'assets/Payload/moddingapi_payload.zip'
           ls -lah artifact
 
       - uses: actions/upload-artifact@v4
         with:
-          name: NSC-ModManager-Android-Phase2A-arm64-net10
+          name: NSC-ModManager-Android-Phase2A.1-arm64-net10
           path: artifact/*.apk
