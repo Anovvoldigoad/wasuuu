@@ -1,7 +1,7 @@
 using Android.App;
 using Android.Content;
 using Android.Database;
-using Android.Net;
+using AndroidUri = Android.Net.Uri;
 using Android.OS;
 using Android.Provider;
 using Android.Views;
@@ -114,7 +114,7 @@ public sealed class MainActivity : Activity
         {
             if (Build.VERSION.SdkInt >= BuildVersionCodes.R && !Android.OS.Environment.IsExternalStorageManager)
             {
-                var uri = Uri.Parse("package:" + PackageName);
+                var uri = AndroidUri.Parse("package:" + PackageName);
                 StartActivity(new Intent(Settings.ActionManageAppAllFilesAccessPermission, uri));
             }
             else SetStatus("Storage access already available (or not required on this Android version).");
@@ -161,7 +161,7 @@ public sealed class MainActivity : Activity
         catch (Exception ex) { SetStatus("Install failed: " + ex.Message); }
     }
 
-    string? GetDisplayName(Uri uri)
+    string? GetDisplayName(AndroidUri uri)
     {
         using ICursor? cursor = ContentResolver?.Query(uri, null, null, null, null);
         if (cursor is not null && cursor.MoveToFirst())
