@@ -4,6 +4,7 @@ using System.IO.Compression;
 using NSC_ModManager;
 using NSC_ModManager.Model;
 using NSC_ModManager.ViewModel;
+using NSC_Toolbox.ViewModel;
 using BinaryReader = NSC_ModManager.BinaryReader;
 
 namespace NSC_ModManager_Android.Core;

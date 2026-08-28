@@ -314,10 +314,10 @@ public sealed class MainActivity : Activity
             Directory.CreateDirectory(dir);
             string path = Path.Combine(dir, "nsc_android_last_error.txt");
             File.WriteAllText(path,
-                "NSC Mod Manager Android — Phase 2B last compile error" + Environment.NewLine +
-                "Time: " + DateTime.Now.ToString("O") + Environment.NewLine +
-                "App: 0.3.2" + Environment.NewLine +
-                "Game: " + game + Environment.NewLine + Environment.NewLine +
+                "NSC Mod Manager Android — Phase 2B last compile error" + System.Environment.NewLine +
+                "Time: " + DateTime.Now.ToString("O") + System.Environment.NewLine +
+                "App: 0.3.3" + System.Environment.NewLine +
+                "Game: " + game + System.Environment.NewLine + System.Environment.NewLine +
                 ex.ToString());
             return path;
         }
