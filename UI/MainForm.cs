@@ -14,7 +14,7 @@ namespace NSC_ModManager.UI;
 
 public sealed class MainForm : Form
 {
-    private readonly TitleViewModel _vm;
+    private TitleViewModel _vm = null!;
     private readonly ComboBox _game = new();
     private readonly TextBox _gameFolder = new();
     private readonly TextBox _modFolder = new();
@@ -35,53 +35,85 @@ public sealed class MainForm : Form
     public MainForm()
     {
         WinlatorEntry.Trace("MainForm: constructor entered");
+
+        // Keep the pre-handle constructor deliberately tiny for Wine/ARM64EC.
+        // Complex controls and the original ViewModel are created only after
+        // the native form handle has been shown successfully.
+        WinlatorEntry.Trace("MainForm: setting Text");
         Text = "NSC Mod Manager 2.1.1.0 - Winlator Edition";
-        StartPosition = FormStartPosition.CenterScreen;
-        MinimumSize = new Size(850, 600);
-        ClientSize = new Size(1050, 720);
-        Font = new Font("Segoe UI", 9F);
-        // Avoid Wine ARM64EC DPI-hosting paths; scale the whole utility window externally instead.
+        WinlatorEntry.Trace("MainForm: Text set");
+
+        WinlatorEntry.Trace("MainForm: setting basic size");
+        Width = 900;
+        Height = 650;
+        WinlatorEntry.Trace("MainForm: basic size set");
+
+        // Do not set a custom Font, CenterScreen, MinimumSize, or DPI autoscaling
+        // before the first HWND exists. These paths are problematic in some
+        // ARM64EC Wine builds.
         AutoScaleMode = AutoScaleMode.None;
+        WinlatorEntry.Trace("MainForm: constructor minimal setup complete");
 
-        WinlatorEntry.Trace("MainForm: BuildUi begin");
-        BuildUi();
-        WinlatorEntry.Trace("MainForm: BuildUi complete");
-
-        UiBridge.Message += AppendLog;
-        WinlatorEntry.Trace("MainForm: UI built; constructing TitleViewModel");
-        _vm = new TitleViewModel();
-        WinlatorEntry.Trace("MainForm: TitleViewModel constructed");
-
-        _game.Items.AddRange(new object[] { "Storm Connections", "Storm 4" });
-        _game.SelectedIndex = Settings.Default.StormVersion == 2 ? 1 : 0;
-        _launchAfterCompile.Checked = Settings.Default.LaunchAfterCompile;
-
-        LoadSettingsIntoUi();
-        _initializing = false;
-        RefreshModListUi();
-        UpdateBusyState();
-
-        _stateTimer.Tick += (_, _) => UpdateBusyState();
-        _stateTimer.Start();
-
-        Shown += (_, _) =>
+        Shown += MainForm_Shown;
+        FormClosed += (_, _) =>
         {
             try
             {
-                System.Windows.Application.Current.Dispatcher.BindToControl(this);
-                WinlatorEntry.Trace("MainForm: dispatcher bound to visible MainForm handle");
+                if (!_initializing)
+                    SaveUiSettings();
             }
             catch (Exception ex)
             {
-                WinlatorEntry.Trace("MainForm: dispatcher bind failed: " + ex);
+                WinlatorEntry.Trace("MainForm: FormClosed save failed: " + ex);
             }
-        };
-
-        FormClosed += (_, _) =>
-        {
-            SaveUiSettings();
             UiBridge.Message -= AppendLog;
         };
+    }
+
+    private void MainForm_Shown(object? sender, EventArgs e)
+    {
+        // Run once only. Unsubscribe immediately so accidental re-show does not
+        // reconstruct the original NSC backend.
+        Shown -= MainForm_Shown;
+        WinlatorEntry.Trace("MainForm: Shown fired; native HWND is alive");
+
+        try
+        {
+            System.Windows.Application.Current.Dispatcher.BindToControl(this);
+            WinlatorEntry.Trace("MainForm: dispatcher bound to visible MainForm handle");
+
+            WinlatorEntry.Trace("MainForm: BuildUi begin (post-show)");
+            BuildUi();
+            WinlatorEntry.Trace("MainForm: BuildUi complete (post-show)");
+
+            UiBridge.Message += AppendLog;
+            WinlatorEntry.Trace("MainForm: constructing TitleViewModel (post-show)");
+            _vm = new TitleViewModel();
+            WinlatorEntry.Trace("MainForm: TitleViewModel constructed");
+
+            _game.Items.AddRange(new object[] { "Storm Connections", "Storm 4" });
+            _game.SelectedIndex = Settings.Default.StormVersion == 2 ? 1 : 0;
+            _launchAfterCompile.Checked = Settings.Default.LaunchAfterCompile;
+
+            LoadSettingsIntoUi();
+            _initializing = false;
+            RefreshModListUi();
+            UpdateBusyState();
+
+            _stateTimer.Tick += (_, _) => UpdateBusyState();
+            _stateTimer.Start();
+            WinlatorEntry.Trace("MainForm: post-show initialization complete");
+        }
+        catch (Exception ex)
+        {
+            WinlatorEntry.Trace("MainForm: post-show initialization FAILED: " + ex);
+            // Keep the empty native window alive so Wine remains debuggable.
+            try
+            {
+                Text = "NSC Mod Manager - startup failed (see winlator_startup.log)";
+            }
+            catch { }
+        }
     }
 
     private void BuildUi()
