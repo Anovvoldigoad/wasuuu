@@ -9,7 +9,7 @@ internal static class LegacyParamConfig
         var list = new List<CharacterModModel>();
         foreach (var mod in mods)
         {
-            foreach (string cfg in Directory.EnumerateFiles(mod.RootPath, "character_config.ini", SearchOption.AllDirectories)
+            foreach (string cfg in CommunityFileDiscovery.EnumerateNamed(mod.RootPath, "character_config.ini")
                          .OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
             {
                 var ini = new IniFile(cfg);
@@ -38,7 +38,7 @@ internal static class LegacyParamConfig
         var list = new List<StageModModel>();
         foreach (var mod in mods)
         {
-            foreach (string cfg in Directory.EnumerateFiles(mod.RootPath, "stage_config.ini", SearchOption.AllDirectories)
+            foreach (string cfg in CommunityFileDiscovery.EnumerateNamed(mod.RootPath, "stage_config.ini")
                          .OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
             {
                 var ini = new IniFile(cfg);

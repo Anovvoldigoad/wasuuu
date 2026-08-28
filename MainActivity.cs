@@ -14,6 +14,7 @@ namespace NSC_ModManager_Android;
 public sealed class MainActivity : Activity
 {
     const int PickModRequest = 1001;
+    const int PickGameFolderRequest = 1002;
     AndroidPrefs _prefs = null!;
     EditText _gamePath = null!;
     EditText _modsPath = null!;
@@ -26,6 +27,7 @@ public sealed class MainActivity : Activity
     List<ModInfo> _mods = new();
     string _payloadZip = "";
     string _baseParamZip = "";
+    string _messageBaseZip = "";
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -45,6 +47,8 @@ public sealed class MainActivity : Activity
         CopyBundledAsset("Payload/moddingapi_payload.zip", _payloadZip);
         _baseParamZip = Path.Combine(baseDir, "Payload", "nsc_param_base.zip");
         CopyBundledAsset("Payload/nsc_param_base.zip", _baseParamZip);
+        _messageBaseZip = Path.Combine(baseDir, "Payload", "nsc_message_base.zip");
+        CopyBundledAsset("Payload/nsc_message_base.zip", _messageBaseZip);
         Directory.SetCurrentDirectory(baseDir);
     }
 
@@ -68,16 +72,20 @@ public sealed class MainActivity : Activity
         scroll.AddView(root);
 
         root.AddView(new TextView(this) { Text = "NSC Mod Manager — Android ARM64", TextSize = 22 });
-        root.AddView(new TextView(this) { Text = "Phase 2B: native CPK + semantic character/stage XFBIN compiler. No Winlator/Wine required." });
+        root.AddView(new TextView(this) { Text = "Phase 2C.1: generic compiler + game folder picker + safe game cleanup/ModdingAPI removal. Native ARM64 CPK; no Winlator/Wine required." });
 
         root.AddView(new TextView(this) { Text = "Game directory" });
         _gamePath = new EditText(this) { Text = _prefs.GamePath, Hint = "/storage/.../Storm Connections" };
         root.AddView(_gamePath);
 
         var gameRow = Row();
+        gameRow.AddView(MakeButton("Select Game Folder", (_, _) => PickGameFolder()));
         gameRow.AddView(MakeButton("Save / Check Path", (_, _) => SaveGamePath()));
-        gameRow.AddView(MakeButton("Storage Access", (_, _) => RequestAllFilesAccess()));
         root.AddView(gameRow);
+
+        var storageRow = Row();
+        storageRow.AddView(MakeButton("Storage Access", (_, _) => RequestAllFilesAccess()));
+        root.AddView(storageRow);
 
         root.AddView(new TextView(this) { Text = "Mod storage directory" });
         _modsPath = new EditText(this) { Text = _prefs.ModsPath };
@@ -102,6 +110,11 @@ public sealed class MainActivity : Activity
         compilerActions.AddView(_compileButton);
         compilerActions.AddView(MakeButton("Install / Update ModdingAPI", (_, _) => InstallModdingApiOnly()));
         root.AddView(compilerActions);
+
+        var maintenance = Row();
+        maintenance.AddView(MakeButton("Clear Compiled Mods", (_, _) => ConfirmClearCompiledMods()));
+        maintenance.AddView(MakeButton("Remove ModdingAPI", (_, _) => ConfirmRemoveModdingApi()));
+        root.AddView(maintenance);
 
         var cpk = Row();
         cpk.AddView(MakeButton("CPK Pack + Extract Self-Test", (_, _) => CpkSelfTest()));
@@ -154,6 +167,23 @@ public sealed class MainActivity : Activity
         SetStatus(check.Message);
     }
 
+    void PickGameFolder()
+    {
+        try
+        {
+            var intent = new Intent(Intent.ActionOpenDocumentTree);
+            intent.AddFlags(ActivityFlags.GrantReadUriPermission
+                            | ActivityFlags.GrantWriteUriPermission
+                            | ActivityFlags.GrantPersistableUriPermission
+                            | ActivityFlags.GrantPrefixUriPermission);
+            StartActivityForResult(intent, PickGameFolderRequest);
+        }
+        catch (Exception ex)
+        {
+            SetStatus("Folder picker failed: " + ex.Message);
+        }
+    }
+
     void PickMod()
     {
         var intent = new Intent(Intent.ActionOpenDocument);
@@ -166,7 +196,15 @@ public sealed class MainActivity : Activity
     protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
     {
         base.OnActivityResult(requestCode, resultCode, data);
-        if (requestCode != PickModRequest || resultCode != Result.Ok || data?.Data is null) return;
+        if (resultCode != Result.Ok || data?.Data is null) return;
+
+        if (requestCode == PickGameFolderRequest)
+        {
+            HandlePickedGameFolder(data);
+            return;
+        }
+        if (requestCode != PickModRequest) return;
+
         try
         {
             _prefs.ModsPath = _modsPath.Text?.Trim() ?? _prefs.ModsPath;
@@ -183,6 +221,33 @@ public sealed class MainActivity : Activity
             RefreshMods();
         }
         catch (Exception ex) { SetStatus("Install failed: " + ex.Message); }
+    }
+
+    void HandlePickedGameFolder(Intent data)
+    {
+        AndroidUri? uri = data.Data;
+        if (uri is null) return;
+        try
+        {
+            ActivityFlags takeFlags = data.Flags & (ActivityFlags.GrantReadUriPermission | ActivityFlags.GrantWriteUriPermission);
+            try { ContentResolver?.TakePersistableUriPermission(uri, takeFlags); } catch { /* Direct-path access remains the compiler requirement. */ }
+
+            if (!AndroidFolderPathResolver.TryResolve(uri, out string path, out string error))
+            {
+                SetStatus(error);
+                return;
+            }
+
+            _gamePath.Text = path;
+            _prefs.GamePath = path;
+            var check = PathValidator.ValidateGamePath(path);
+            string accessNote = string.IsNullOrWhiteSpace(error) ? check.Message : error;
+            SetStatus("Selected: " + path + " | " + accessNote);
+        }
+        catch (Exception ex)
+        {
+            SetStatus("Cannot use selected game folder: " + ex.Message);
+        }
     }
 
     string? GetDisplayName(AndroidUri uri)
@@ -265,6 +330,60 @@ public sealed class MainActivity : Activity
         }
     }
 
+    void ConfirmClearCompiledMods()
+    {
+        new AlertDialog.Builder(this)
+            .SetTitle("Clear compiled mods?")
+            .SetMessage("Removes NSC Mod Manager generated CPKs, restores backed-up game files, and resets ModdingAPI parameters. Installed mod packages remain in NSC-ModManager/mods and ModdingAPI stays installed.")
+            .SetNegativeButton("Cancel", (_, _) => { })
+            .SetPositiveButton("Clear", async (_, _) => await ClearCompiledModsAsync())
+            .Show();
+    }
+
+    async Task ClearCompiledModsAsync()
+    {
+        try
+        {
+            SaveGamePath();
+            var check = PathValidator.ValidateGamePath(_prefs.GamePath);
+            if (!check.Ok) { SetStatus(check.Message); return; }
+            SetStatus("Clearing generated mod files and restoring backups...");
+            GameCleanupResult result = await Task.Run(() => GameCleanup.ClearCompiledMods(_payloadZip, _prefs.GamePath));
+            SetStatus(result.ClearSummary);
+        }
+        catch (Exception ex)
+        {
+            SetStatus("Clear game failed: " + ex.Message);
+        }
+    }
+
+    void ConfirmRemoveModdingApi()
+    {
+        new AlertDialog.Builder(this)
+            .SetTitle("Remove ModdingAPI?")
+            .SetMessage("Restores NSC Mod Manager backups, removes compiled outputs and files from the bundled ModdingAPI payload. Unrelated files are preserved. Installed mod packages in NSC-ModManager/mods are not deleted.")
+            .SetNegativeButton("Cancel", (_, _) => { })
+            .SetPositiveButton("Remove", async (_, _) => await RemoveModdingApiAsync())
+            .Show();
+    }
+
+    async Task RemoveModdingApiAsync()
+    {
+        try
+        {
+            SaveGamePath();
+            var check = PathValidator.ValidateGamePath(_prefs.GamePath);
+            if (!check.Ok) { SetStatus(check.Message); return; }
+            SetStatus("Removing ModdingAPI and restoring game backups...");
+            GameCleanupResult result = await Task.Run(() => GameCleanup.RemoveModdingApi(_payloadZip, _prefs.GamePath));
+            SetStatus(result.RemoveApiSummary);
+        }
+        catch (Exception ex)
+        {
+            SetStatus("Remove ModdingAPI failed: " + ex.Message);
+        }
+    }
+
     async Task CompileModsAsync()
     {
         if (!_compileButton.Enabled) return;
@@ -275,6 +394,7 @@ public sealed class MainActivity : Activity
             if (!check.Ok) { SetStatus(check.Message); return; }
             if (!File.Exists(_payloadZip)) { SetStatus("Bundled ModdingAPI payload is missing from APK."); return; }
             if (!File.Exists(_baseParamZip)) { SetStatus("Bundled NSC parameter baseline is missing from APK."); return; }
+            if (!File.Exists(_messageBaseZip)) { SetStatus("Bundled NSC localization baseline is missing from APK."); return; }
 
             _compileButton.Enabled = false;
             SetStatus("Starting compile...");
@@ -282,7 +402,7 @@ public sealed class MainActivity : Activity
             IProgress<string> progress = new Progress<string>(message => SetStatus(message));
 
             CompileResult result = await Task.Run(() =>
-                _compiler.Compile(_prefs.GamePath, _prefs.ModsPath, _payloadZip, _baseParamZip, work, message => progress.Report(message)));
+                _compiler.Compile(_prefs.GamePath, _prefs.ModsPath, _payloadZip, _baseParamZip, _messageBaseZip, work, message => progress.Report(message)));
 
             string suffix = result.Warnings.Count == 0
                 ? ""
@@ -314,9 +434,9 @@ public sealed class MainActivity : Activity
             Directory.CreateDirectory(dir);
             string path = Path.Combine(dir, "nsc_android_last_error.txt");
             File.WriteAllText(path,
-                "NSC Mod Manager Android — Phase 2B last compile error" + System.Environment.NewLine +
+                "NSC Mod Manager Android — Phase 2C.1 last compile error" + System.Environment.NewLine +
                 "Time: " + DateTime.Now.ToString("O") + System.Environment.NewLine +
-                "App: 0.3.4" + System.Environment.NewLine +
+                "App: 0.4.1" + System.Environment.NewLine +
                 "Game: " + game + System.Environment.NewLine + System.Environment.NewLine +
                 ex.ToString());
             return path;

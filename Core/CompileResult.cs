@@ -11,6 +11,8 @@ public sealed class CompileResult
     public int CharacterConfigsDetected { get; internal set; }
     public int StageConfigsDetected { get; internal set; }
     public int ModelConfigsDetected { get; internal set; }
+    public int TujConfigsDetected { get; internal set; }
+    public int SpecialInteractionConfigsDetected { get; internal set; }
     public int ModdingApiFilesInstalled { get; internal set; }
     public int ParameterXfbinsMerged { get; internal set; }
     public int CharacterConfigsMerged { get; internal set; }
@@ -20,10 +22,19 @@ public sealed class CompileResult
     public int StageResourceXfbinsGenerated { get; internal set; }
     public int FixedRuntimeFilesGenerated { get; internal set; }
     public int BaseResourceFilesStaged { get; internal set; }
+    public int MessageSourceFilesDetected { get; internal set; }
+    public int MessageTargetLanguagesMerged { get; internal set; }
+    public int MessageEntriesMerged { get; internal set; }
+    public int MessageOutputsGenerated { get; internal set; }
+    public int SpecialApiFilesDetected { get; internal set; }
+    public int SpecialApiFilesMerged { get; internal set; }
+    public int PrmFilesDetected { get; internal set; }
+    public int PrmFilesRemapped { get; internal set; }
     public string? ReportPath { get; internal set; }
     public List<string> ParameterInputs { get; } = new();
+    public List<string> FeatureDetails { get; } = new();
     public List<string> Warnings { get; } = new();
 
     public string Summary =>
-        $"Compiled {EnabledMods} mod(s) | resources {ResourceFiles} | CPK {CpkArchivesRead}->{CpkArchivesPacked} | shaders {ShaderFiles} | params {ParameterXfbinsMerged} merged | UI {CharacterUiFilesGenerated + StageUiFilesGenerated}";
+        $"Compiled {EnabledMods} mod(s) | resources {ResourceFiles} | CPK {CpkArchivesRead}->{CpkArchivesPacked} | shaders {ShaderFiles} | params {ParameterXfbinsMerged} merged | messages {MessageOutputsGenerated} | API {SpecialApiFilesMerged} | UI {CharacterUiFilesGenerated + StageUiFilesGenerated}";
 }

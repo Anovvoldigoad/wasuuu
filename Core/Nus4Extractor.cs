@@ -5,7 +5,7 @@ namespace NSC_ModManager_Android.Core;
 /// <summary>
 /// Portable Phase-1 converter for .nus4 packages.
 /// This intentionally contains no references to the original Windows UI/view-model layer.
-/// The full PRM/message-XFBIN transforms are deferred to the Android compiler phase.
+/// PRM/message-XFBIN transforms are handled by the semantic compiler when their feature handlers are available.
 /// </summary>
 public static class Nus4Extractor
 {
@@ -98,7 +98,7 @@ public static class Nus4Extractor
                     CopyDataWin32(dataWin32, characterData, resourcesFilesData);
 
                     if (Directory.GetFiles(dataWin32, "*prm.bin.xfbin", SearchOption.AllDirectories).Length > 0)
-                        compatibilityNotes.Add($"Character '{characterName}': PRM compatibility transform is deferred to Android compiler Phase 2.");
+                        compatibilityNotes.Add($"Character '{characterName}': PRM compatibility transform is deferred to the semantic compiler.");
                 }
 
                 string shadersSource = Path.Combine(characterFolder, "shaders");
@@ -140,7 +140,7 @@ public static class Nus4Extractor
                 if (File.Exists(stagePreview))
                     File.Copy(stagePreview, Path.Combine(stageDestination, "stage_preview.png"), overwrite: true);
 
-                compatibilityNotes.Add($"Stage '{stageName}': stage message XFBIN generation is deferred to Android compiler Phase 2; stageMessage.txt was preserved.");
+                compatibilityNotes.Add($"Stage '{stageName}': stage message XFBIN generation is deferred to the semantic compiler; stageMessage.txt was preserved.");
             }
 
             if (compatibilityNotes.Count > 0)

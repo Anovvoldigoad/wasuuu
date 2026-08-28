@@ -27,6 +27,7 @@ internal sealed class LegacyParamCompiler
     public Output Compile(
         IReadOnlyList<ModInfo> enabled,
         string baseParamZip,
+        string messageBaseZip,
         string moddingApiPayloadZip,
         string root_folder,
         CompileResult result,
@@ -52,6 +53,16 @@ internal sealed class LegacyParamCompiler
         List<StageModModel> StageList = LegacyParamConfig.LoadStages(enabled);
         result.CharacterConfigsMerged = CharacterList.Count;
         result.StageConfigsMerged = StageList.Count;
+
+        bool hasMessageMods = CharacterList.Any(c => Directory.Exists(Path.Combine(c.RootPath, "data", "message")))
+            || StageList.Any(s => Directory.Exists(Path.Combine(s.RootPath, "data", "message")));
+        MessageInfoMerger.State? messageState = null;
+        bool messageInfoModified = false;
+        if (hasMessageMods)
+        {
+            progress("Semantic params: loading localization baseline...");
+            messageState = MessageInfoMerger.LoadNscBaseline(messageBaseZip, root_folder);
+        }
 
         progress($"Semantic params: loading vanilla baseline ({CharacterList.Count} character, {StageList.Count} stage config)...");
 
@@ -282,6 +293,8 @@ internal sealed class LegacyParamCompiler
                     //conditionprm and conditionprmManager
                     if (File.Exists(conditionprmModPath) && File.Exists(conditionprmManagerModPath))
                     {
+                        result.SpecialApiFilesMerged++;
+                        result.FeatureDetails.Add($"character {mod_characode}: conditionprm + conditionprmManager");
                         conditionprm_mod.OpenFile(conditionprmModPath);
                         conditionprmManager_mod.OpenFile(conditionprmManagerModPath);
 
@@ -1470,6 +1483,9 @@ internal sealed class LegacyParamCompiler
                     if (File.Exists(specialCondParamModPath))
                     {
                         specialCondParam_mod = File.ReadAllBytes(specialCondParamModPath);
+                        if (specialCondParam_mod.Length % 32 != 0) result.Warnings.Add($"character {mod_characode}: specialCondParam size {specialCondParam_mod.Length} is not a multiple of 32 bytes");
+                        result.SpecialApiFilesMerged++;
+                        result.FeatureDetails.Add($"character {mod_characode}: specialCondParam ({specialCondParam_mod.Length} bytes)");
                         specialCondParam_mod = BinaryReader.b_ReplaceBytes(specialCondParam_mod, new byte[4] { 0, 0, 0, 0 }, 0x17);
                         specialCondParam_mod = BinaryReader.b_ReplaceBytes(specialCondParam_mod, BitConverter.GetBytes(mod_characodeID), 0x18);
                         specialCondParam_vanilla = BinaryReader.b_AddBytes(specialCondParam_vanilla, specialCondParam_mod);
@@ -1480,6 +1496,8 @@ internal sealed class LegacyParamCompiler
                     if (File.Exists(partnerSlotParamModPath))
                     {
                         partnerSlotParam_mod = File.ReadAllBytes(partnerSlotParamModPath);
+                        result.SpecialApiFilesMerged++;
+                        result.FeatureDetails.Add($"character {mod_characode}: partnerSlotParam ({partnerSlotParam_mod.Length} bytes)");
                         partnerSlotParam_mod = BinaryReader.b_ReplaceBytes(partnerSlotParam_mod, new byte[4] { 0, 0, 0, 0 }, 0x17);
                         partnerSlotParam_mod = BinaryReader.b_ReplaceBytes(partnerSlotParam_mod, BitConverter.GetBytes(mod_characodeID), 0x18);
                         partnerSlotParam_vanilla = BinaryReader.b_AddBytes(partnerSlotParam_vanilla, partnerSlotParam_mod);
@@ -1490,6 +1508,8 @@ internal sealed class LegacyParamCompiler
                     if (File.Exists(susanooCondParamModPath))
                     {
                         susanooCondParam_mod = File.ReadAllBytes(susanooCondParamModPath);
+                        result.SpecialApiFilesMerged++;
+                        result.FeatureDetails.Add($"character {mod_characode}: susanooCondParam ({susanooCondParam_mod.Length} bytes)");
                         susanooCondParam_mod = BinaryReader.b_ReplaceBytes(susanooCondParam_mod, new byte[4] { 0, 0, 0, 0 }, 0x17);
                         susanooCondParam_mod = BinaryReader.b_ReplaceBytes(susanooCondParam_mod, BitConverter.GetBytes(mod_characodeID), 0x18);
                         susanooCondParam_vanilla = BinaryReader.b_AddBytes(susanooCondParam_vanilla, susanooCondParam_mod);
@@ -1499,6 +1519,8 @@ internal sealed class LegacyParamCompiler
                     GuardEffectParamViewModel guardEffectParam_mod = new GuardEffectParamViewModel();
                     if (File.Exists(guardEffectParamModPath))
                     {
+                        result.SpecialApiFilesMerged++;
+                        result.FeatureDetails.Add($"character {mod_characode}: guardEffectParam");
                         guardEffectParam_mod.OpenFile(guardEffectParamModPath);
                         for (int i = 0; i < guardEffectParam_mod.GuardEffectParamList.Count; i++)
                         {
@@ -1513,6 +1535,9 @@ internal sealed class LegacyParamCompiler
                     if (File.Exists(ougiAwakeningParamModPath))
                     {
                         ougiAwakeningParam_mod = File.ReadAllBytes(ougiAwakeningParamModPath);
+                        if (ougiAwakeningParam_mod.Length % 4 != 0) result.Warnings.Add($"character {mod_characode}: ougiAwakeningParam size {ougiAwakeningParam_mod.Length} is not a multiple of 4 bytes");
+                        result.SpecialApiFilesMerged++;
+                        result.FeatureDetails.Add($"character {mod_characode}: ougiAwakeningParam ({ougiAwakeningParam_mod.Length} bytes)");
                         ougiAwakeningParam_mod = BinaryReader.b_ReplaceBytes(ougiAwakeningParam_mod, BitConverter.GetBytes(mod_characodeID), 0, 0, 4);
                         ougiAwakeningParam_vanilla = BinaryReader.b_AddBytes(ougiAwakeningParam_vanilla, ougiAwakeningParam_mod);
                     }
@@ -1521,13 +1546,18 @@ internal sealed class LegacyParamCompiler
                     if (File.Exists(gudoBallParamModPath))
                     {
                         gudoBallParam_mod = File.ReadAllBytes(gudoBallParamModPath);
+                        result.SpecialApiFilesMerged++;
+                        result.FeatureDetails.Add($"character {mod_characode}: gudoBallParam ({gudoBallParam_mod.Length} bytes)");
                         gudoBallParam_mod = BinaryReader.b_ReplaceBytes(gudoBallParam_mod, BitConverter.GetBytes(mod_characodeID), 0, 0, 4);
                         gudoBallParam_vanilla = BinaryReader.b_AddBytes(gudoBallParam_vanilla, gudoBallParam_mod);
                     }
 
 
-                    if (Directory.Exists(messageInfoModPath))
-                        result.Warnings.Add($"Message/localization merge deferred for character {mod_characode}; parameter records are still merged.");
+                    if (Directory.Exists(messageInfoModPath) && messageState is not null)
+                    {
+                        if (MessageInfoMerger.QueueDirectory(messageState, messageInfoModPath, stormVersion, $"character {mod_characode}"))
+                            messageInfoModified = true;
+                    }
 
                     //damageprm file
                     DamagePrmViewModel damageprm_mod = new DamagePrmViewModel();
@@ -1574,7 +1604,10 @@ internal sealed class LegacyParamCompiler
 
                     if (prmFiles.Length > 0)
                     {
+                        result.PrmFilesDetected += prmFiles.Length;
+                        if (prmFiles.Length > 1) result.Warnings.Add($"character {mod_characode}: multiple PRM candidates detected ({prmFiles.Length}); desktop-compatible last path wins");
                         string prm_path = prmFiles.Last().FullName;
+                        result.FeatureDetails.Add($"character {mod_characode}: PRM candidate {Path.GetFileName(prm_path)}");
                         string relative = RelativeFromData(prm_path);
                         string new_prm_path = Path.Combine(root_folder, "param_files", relative);
 
@@ -1634,6 +1667,12 @@ internal sealed class LegacyParamCompiler
                             // save result
                             Directory.CreateDirectory(Path.GetDirectoryName(new_prm_path)!);
                             prm_mod.SaveFileAs(new_prm_path);
+                            result.PrmFilesRemapped++;
+                            result.FeatureDetails.Add($"character {mod_characode}: PRM damage-effect IDs remapped");
+                        }
+                        else if (File.Exists(prm_path))
+                        {
+                            result.FeatureDetails.Add($"character {mod_characode}: PRM passthrough (no character damageeff.bin.xfbin to remap)");
                         }
                     }
 
@@ -1703,8 +1742,11 @@ internal sealed class LegacyParamCompiler
                             stageInfo_vanilla.StageInfoList.Add((StageInfoModel)stageInfo_mod.StageInfoList[0].Clone());
                         }
                     }
-                    if (Directory.Exists(messageInfoModPath))
-                        result.Warnings.Add($"Message/localization merge deferred for stage {mod_stagename}; StageInfo is still merged.");
+                    if (Directory.Exists(messageInfoModPath) && messageState is not null)
+                    {
+                        if (MessageInfoMerger.QueueDirectory(messageState, messageInfoModPath, stormVersion, $"stage {mod_stagename}"))
+                            messageInfoModified = true;
+                    }
                 }
 
         progress("Semantic params: generating character/stage selection UI...");
@@ -1750,6 +1792,19 @@ internal sealed class LegacyParamCompiler
         SaveChecked(() => effectprm_vanilla.SaveFileAs(Path.Combine(param_modmanager_path, "data", "spc", "effectprm.bin.xfbin")), Path.Combine(param_modmanager_path, "data", "spc", "effectprm.bin.xfbin"), ref saved);
         SaveChecked(() => damageprm_vanilla.SaveFileAs(Path.Combine(param_modmanager_path, "data", "spc", "damageprm.bin.xfbin")), Path.Combine(param_modmanager_path, "data", "spc", "damageprm.bin.xfbin"), ref saved);
         if (stageInfoModified) SaveChecked(() => stageInfo_vanilla.SaveFileAs(Path.Combine(param_modmanager_path, "data", "stage", "StageInfo.bin.xfbin")), Path.Combine(param_modmanager_path, "data", "stage", "StageInfo.bin.xfbin"), ref saved);
+
+        if (messageInfoModified && messageState is not null)
+        {
+            progress("Semantic params: writing localization XFBINs...");
+            var msg = MessageInfoMerger.Save(messageState, param_modmanager_path);
+            result.MessageSourceFilesDetected = msg.SourceFilesDetected;
+            result.MessageTargetLanguagesMerged = msg.TargetLanguageMerges;
+            result.MessageEntriesMerged = msg.EntriesAppended;
+            result.MessageOutputsGenerated = msg.OutputsGenerated;
+            result.FeatureDetails.AddRange(msg.Details);
+            if (msg.MissingSourceMappings > 0)
+                result.Warnings.Add($"Localization merge had {msg.MissingSourceMappings} missing language mapping(s); vanilla text was preserved for those targets. See feature details.");
+        }
 
         conditionprmManager_vanilla.SaveFileAs(Path.Combine(generatedApiParam, "conditionprmManager.xfbin"));
         guardEffectParam_vanilla.SaveFileAs(Path.Combine(generatedApiParam, "guardEffectParam.xfbin"));

@@ -11,6 +11,7 @@ public sealed class AndroidCompiler
         string modsPath,
         string moddingApiPayloadZip,
         string baseParamZip,
+        string messageBaseZip,
         string workRoot,
         Action<string>? progress = null,
         CancellationToken cancellationToken = default)
@@ -45,19 +46,25 @@ public sealed class AndroidCompiler
             cancellationToken.ThrowIfCancellationRequested();
             progress($"Reading {mod.Name}...");
 
+            ModCapabilities capabilities = ModCapabilityScanner.Scan(mod);
+            result.FeatureDetails.Add("feature-map: " + capabilities.Describe(mod.Name));
+
             string resources = Path.Combine(mod.RootPath, "Resources", "Files");
             result.ResourceFiles += FileTree.CopyResourceFiles(resources, dataWin32, result);
 
             // Old .nus4 conversion and native NSC packages may place parameter-like data under
             // Characters/Stages. Count and validate them now, but do not perform an unsafe whole-file
-            // override. Phase 2B merges owned records through character/stage configs into
+            // override. The semantic compiler merges owned records through character/stage configs into
             // the bundled vanilla baseline instead of installing whole-file overrides.
             ScanPendingParameterFiles(mod, result);
-            result.CharacterConfigsDetected += Directory.EnumerateFiles(mod.RootPath, "character_config.ini", SearchOption.AllDirectories).Count();
-            result.StageConfigsDetected += Directory.EnumerateFiles(mod.RootPath, "stage_config.ini", SearchOption.AllDirectories).Count();
-            result.ModelConfigsDetected += Directory.EnumerateFiles(mod.RootPath, "model_config.ini", SearchOption.AllDirectories).Count();
+            result.CharacterConfigsDetected += capabilities.CharacterConfigs;
+            result.StageConfigsDetected += capabilities.StageConfigs;
+            result.ModelConfigsDetected += capabilities.ModelConfigs;
+            result.TujConfigsDetected += capabilities.TujConfigs;
+            result.SpecialInteractionConfigsDetected += capabilities.SpecialInteractionConfigs;
+            result.SpecialApiFilesDetected += capabilities.SpecialApiFiles;
 
-            foreach (string cpk in Directory.EnumerateFiles(mod.RootPath, "*.cpk", SearchOption.AllDirectories).OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
+            foreach (string cpk in CommunityFileDiscovery.EnumerateExtension(mod.RootPath, ".cpk").OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 result.CpkArchivesRead++;
@@ -80,13 +87,27 @@ public sealed class AndroidCompiler
         {
             if (!File.Exists(baseParamZip))
                 throw new FileNotFoundException("Bundled NSC parameter baseline is missing.", baseParamZip);
+            if (!File.Exists(messageBaseZip))
+                throw new FileNotFoundException("Bundled NSC localization baseline is missing.", messageBaseZip);
             progress("Merging character/stage XFBIN parameters...");
-            paramOutput = new LegacyParamCompiler().Compile(enabled, baseParamZip, moddingApiPayloadZip, workRoot, result, progress);
+            paramOutput = new LegacyParamCompiler().Compile(enabled, baseParamZip, messageBaseZip, moddingApiPayloadZip, workRoot, result, progress);
         }
         else if (result.ParameterXfbinsDetected > 0)
         {
             result.Warnings.Add("Parameter XFBINs were detected but no character_config.ini/stage_config.ini exists, so semantic ownership could not be determined safely.");
         }
+
+        // Be explicit about feature families that are detected but do not yet have a
+        // semantic handler. Community mods vary widely, so silently skipping one of
+        // these would make a successful compile report misleading.
+        if (result.ModelConfigsDetected > 0)
+            result.Warnings.Add($"{result.ModelConfigsDetected} model_config.ini file(s) detected; model/costume semantic handler is not implemented yet.");
+        if (result.TujConfigsDetected > 0)
+            result.Warnings.Add($"{result.TujConfigsDetected} TUJ_config.ini file(s) detected; Team Ultimate Jutsu semantic handler is not implemented yet.");
+        if (result.SpecialInteractionConfigsDetected > 0)
+            result.Warnings.Add($"{result.SpecialInteractionConfigsDetected} specialInteraction_config.ini file(s) detected; special-interaction semantic handler is not implemented yet.");
+        if (result.SpecialApiFilesDetected > result.SpecialApiFilesMerged)
+            result.Warnings.Add($"{result.SpecialApiFilesDetected - result.SpecialApiFilesMerged} special ModdingAPI parameter file(s) were detected but not merged by the current semantic handlers; see feature details.");
 
         cancellationToken.ThrowIfCancellationRequested();
         progress("Preparing shader merge...");
@@ -142,7 +163,11 @@ public sealed class AndroidCompiler
             string dstApi = Path.Combine(gamePath, "moddingapi", "param", "NSC");
             Directory.CreateDirectory(dstApi);
             foreach (string file in Directory.EnumerateFiles(paramOutput.ModdingApiParamDirectory, "*", SearchOption.TopDirectoryOnly))
-                File.Copy(file, Path.Combine(dstApi, Path.GetFileName(file)), true);
+            {
+                string destination = Path.Combine(dstApi, Path.GetFileName(file));
+                GameCleanup.RegisterManagedFile(gamePath, destination);
+                File.Copy(file, destination, true);
+            }
         }
         progress("Installing generated files into game directory...");
         string baseGame = Path.Combine(gamePath, "moddingapi", "mods", "base_game");
@@ -166,7 +191,7 @@ public sealed class AndroidCompiler
 
     private static void ScanPendingParameterFiles(ModInfo mod, CompileResult result)
     {
-        foreach (string xfbin in Directory.EnumerateFiles(mod.RootPath, "*.xfbin", SearchOption.AllDirectories))
+        foreach (string xfbin in CommunityFileDiscovery.EnumerateExtension(mod.RootPath, ".xfbin"))
         {
             // Files directly under Resources/Files are counted by CopyResourceFiles already.
             string resourcesRoot = Path.Combine(mod.RootPath, "Resources", "Files") + Path.DirectorySeparatorChar;
@@ -191,7 +216,7 @@ public sealed class AndroidCompiler
 
     private static void DeleteGenerated(string baseGame)
     {
-        // Phase 2B owns all four generated archives below. Existing copies are
+        // The Android compiler owns all four generated archives below. Existing copies are
         // backed up once before this cleanup, then replaced only after every
         // staged archive has packed successfully.
         string[] names =
@@ -239,6 +264,7 @@ public sealed class AndroidCompiler
             string backup = destination + ".nscmm_android.bak";
             if (File.Exists(destination) && !File.Exists(backup))
                 File.Copy(destination, backup, false);
+            GameCleanup.RegisterManagedFile(gamePath, destination);
             File.Copy(source, destination, true);
         }
     }
@@ -252,7 +278,7 @@ public sealed class AndroidCompiler
         Directory.CreateDirectory(reportDir);
         string path = Path.Combine(reportDir, "nsc_android_compile_report.txt");
         var sb = new StringBuilder();
-        sb.AppendLine("NSC Mod Manager Android — Phase 2B semantic compile report");
+        sb.AppendLine("NSC Mod Manager Android — Phase 2C generic semantic compile report");
         sb.AppendLine($"Time: {DateTime.Now:O}");
         sb.AppendLine($"Game: {gamePath}");
         sb.AppendLine($"Enabled mods: {result.EnabledMods}");
@@ -270,12 +296,27 @@ public sealed class AndroidCompiler
         sb.AppendLine($"Stage preview/icon XFBINs generated: {result.StageResourceXfbinsGenerated}");
         sb.AppendLine($"Desktop runtime overlay files generated: {result.FixedRuntimeFilesGenerated}");
         sb.AppendLine($"Bundled base resource files staged: {result.BaseResourceFilesStaged}");
+        sb.AppendLine($"Message source files detected: {result.MessageSourceFilesDetected}");
+        sb.AppendLine($"Message target-language merges: {result.MessageTargetLanguagesMerged}");
+        sb.AppendLine($"Message entries appended: {result.MessageEntriesMerged}");
+        sb.AppendLine($"Message XFBIN outputs generated: {result.MessageOutputsGenerated}");
+        sb.AppendLine($"Special ModdingAPI feature files detected: {result.SpecialApiFilesDetected}");
+        sb.AppendLine($"Special ModdingAPI feature files merged: {result.SpecialApiFilesMerged}");
+        sb.AppendLine($"Character PRM files detected: {result.PrmFilesDetected}");
+        sb.AppendLine($"Character PRM files damage-effect remapped: {result.PrmFilesRemapped}");
         if (result.ParameterInputs.Count > 0)
         {
             sb.AppendLine("Parameter inputs:");
             foreach (string input in result.ParameterInputs) sb.AppendLine("  - " + input);
         }
         sb.AppendLine($"Model configs pending: {result.ModelConfigsDetected}");
+        sb.AppendLine($"TUJ configs detected (handler pending): {result.TujConfigsDetected}");
+        sb.AppendLine($"Special-interaction configs detected (handler pending): {result.SpecialInteractionConfigsDetected}");
+        if (result.FeatureDetails.Count > 0)
+        {
+            sb.AppendLine("Feature details:");
+            foreach (string detail in result.FeatureDetails) sb.AppendLine("  - " + detail);
+        }
         sb.AppendLine();
         sb.AppendLine("Warnings:");
         if (result.Warnings.Count == 0) sb.AppendLine("  (none)");

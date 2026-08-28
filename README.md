@@ -1,28 +1,20 @@
-# NSC Mod Manager Android
+# NSC Mod Manager Android — Phase 2C.1
 
-Native Android ARM64 port of the NSC ModManager workflow for Naruto x Boruto: Ultimate Ninja Storm Connections.
+Native Android ARM64 port of the NSC ModManager workflow. No Winlator/Wine is required.
 
-Current build: **Phase 2A / 0.2.0**.
+Current verified foundation from earlier phases:
+- Android app launches on-device.
+- native ARM64 CPK pack/extract bridge works on-device.
+- character/stage semantic merge can produce a playable mod character on-device.
 
-No Winlator, Wine, WinForms, or WPF is used by this app. The Android UI and C# core run through .NET for Android, while CPK pack/extract runs as an ARM64 Android native library built with the NDK.
+Phase 2C adds generic per-mod capability discovery and portable localization merge for `messageInfo.bin.xfbin`. It intentionally treats development mods only as regression fixtures; compilation is dispatched from detected structures/features rather than hardcoded character names.
 
-## Current features
+See `PHASE2C_GENERIC_COMPAT.md` for supported and pending feature families.
 
-- Install `.nsc`, `.ensc`, `.uns`, `.unse`, and legacy `.nus4` packages.
-- Scan, enable/disable, and delete installed mods.
-- Save/check a Storm Connections game directory.
-- Native CPK pack + extract self-test.
-- Install the original ModdingAPI payload into the selected game directory.
-- Compile enabled CPK/resource mods into `cpk_assets.cpk` and `data_win32_modmanager.cpk`.
-- Merge mod shaders into `nuccMaterial_dx11.nsh` with backup.
-- Detect and validate parameter XFBIN files and report semantic work still pending.
+Build target: .NET 10 Android, `android-arm64`.
 
-See `PHASE2A_COMPILER.md` for exact compatibility boundaries.
 
-## Build
-
-Push the source to GitHub and run `.github/workflows/build-android.yml`. The artifact contains one file:
-
-`NSC-ModManager-Android-Phase2A-Signed.apk`
-
-The workflow verifies that both `lib/arm64-v8a/libcpkbridge.so` and the bundled ModdingAPI payload are present inside the signed APK before uploading it.
+## Phase 2C.1 usability
+- Select Game Folder with Android folder picker and direct filesystem path resolution.
+- Clear Compiled Mods restores backups and keeps ModdingAPI installed.
+- Remove ModdingAPI removes bundled payload/compiler output without recursively deleting unrelated user files.

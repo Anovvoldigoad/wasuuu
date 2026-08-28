@@ -12,7 +12,7 @@ public static class ShaderMerger
     {
         var shaders = mods
             .SelectMany(m => Directory.Exists(m.RootPath)
-                ? Directory.EnumerateFiles(m.RootPath, "*.hlsl", SearchOption.AllDirectories)
+                ? CommunityFileDiscovery.EnumerateExtension(m.RootPath, ".hlsl")
                 : Array.Empty<string>())
             .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -71,6 +71,7 @@ public static class ShaderMerger
         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
         string backup = target + ".nscmm_android.bak";
         if (File.Exists(target) && !File.Exists(backup)) File.Copy(target, backup, false);
+        GameCleanup.RegisterManagedFile(gamePath, target);
         File.Copy(stagedOutput, target, true);
     }
 }
