@@ -1,0 +1,73 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <PlatformTarget>x86</PlatformTarget>
+    <Prefer32Bit>true</Prefer32Bit>
+    <RuntimeIdentifier>win-x86</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationIcon>white_MM.ico</ApplicationIcon>
+    <AssemblyName>NSC_ModManager_Winlator</AssemblyName>
+    <RootNamespace>NSC_ModManager</RootNamespace>
+    <Version>2.1.1.0</Version>
+    <FileVersion>2.1.1.0</FileVersion>
+    <AssemblyVersion>2.1.1.0</AssemblyVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="CpkMaker">
+      <HintPath>CpkMaker.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="XFBIN_LIB">
+      <HintPath>lib\XFBIN_LIB.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="DynamicData">
+      <HintPath>lib\DynamicData.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="System.Reactive">
+      <HintPath>lib\System.Reactive.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="NAudio">
+      <HintPath>lib\NAudio.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="NAudio.Core">
+      <HintPath>lib\NAudio.Core.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="NAudio.WinMM">
+      <HintPath>lib\NAudio.WinMM.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="NAudio.Wasapi">
+      <HintPath>lib\NAudio.Wasapi.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="NAudio.Asio">
+      <HintPath>lib\NAudio.Asio.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="YACpkTool.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="vcredist_x86.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="lib\MiscUtil.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="lib\Newtonsoft.Json.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="ModdingAPIFiles\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="ParamFiles\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="Resources\TemplateImages\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="Resources\Styles\UI\charsel_icons\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
