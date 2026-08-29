@@ -32,6 +32,29 @@ public static class ModdingApiInstaller
         }
         return count;
     }
+
+    public static string InstallRuntimeProbe(string payloadZip, string gamePath)
+    {
+        if (!File.Exists(payloadZip))
+            throw new FileNotFoundException("Bundled ModdingAPI payload is missing.", payloadZip);
+
+        const string probeEntry = "moddingapi/mods/base_game/NSCApiRuntimeProbe.dll";
+        using var archive = ZipFile.OpenRead(payloadZip);
+        ZipArchiveEntry? entry = archive.GetEntry(probeEntry);
+        if (entry is null || entry.Length == 0)
+            throw new FileNotFoundException("Phase 2C.3 runtime probe is missing from the bundled ModdingAPI payload.", probeEntry);
+
+        string root = Path.GetFullPath(gamePath).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        string target = Path.GetFullPath(Path.Combine(gamePath, probeEntry.Replace('/', Path.DirectorySeparatorChar)));
+        if (!target.StartsWith(root, StringComparison.Ordinal))
+            throw new InvalidDataException("Unsafe runtime probe target path.");
+
+        string? dir = Path.GetDirectoryName(target);
+        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+        entry.ExtractToFile(target, overwrite: true);
+        return target;
+    }
+
     public static int Uninstall(string payloadZip, string gamePath)
     {
         if (!File.Exists(payloadZip))

@@ -73,12 +73,12 @@ for lang in ('arae','chi','eng','esmx','fre','ger','idid','ita','kokr','pol','po
     if f'"{lang}"' not in message_source:
         errors.append('MessageInfoMerger missing NSC language: ' + lang)
 
-# 2f) Phase 2C.2 UX/maintenance and runtime diagnostics features must remain wired to direct-path
+# 2f) Phase 2C.3 UX/maintenance and runtime diagnostics features must remain wired to direct-path
 # Android folder selection and non-destructive cleanup.
 main_activity = (ROOT / 'MainActivity.cs').read_text(encoding='utf-8-sig', errors='ignore')
 cleanup_source = (ROOT / 'Core' / 'GameCleanup.cs').read_text(encoding='utf-8-sig', errors='ignore')
 folder_source = (ROOT / 'Core' / 'AndroidFolderPathResolver.cs').read_text(encoding='utf-8-sig', errors='ignore')
-for token in ('Intent.ActionOpenDocumentTree', 'PickGameFolderRequest', 'Clear Compiled Mods', 'Remove ModdingAPI', 'Toggle API Debug', 'Export API Log'):
+for token in ('Intent.ActionOpenDocumentTree', 'PickGameFolderRequest', 'Clear Compiled Mods', 'Remove ModdingAPI', 'Arm API Probe', 'Check API Runtime', 'Toggle API Debug', 'Export API Diagnostics'):
     if token not in main_activity:
         errors.append('Phase 2C.2 UI feature missing: ' + token)
 for token in ('RegisterManagedFile', 'ClearCompiledMods', 'RemoveModdingApi', '.nscmm_android.bak'):
@@ -89,12 +89,25 @@ if 'com.android.externalstorage.documents' not in folder_source:
 
 diag_source = (ROOT / 'Core' / 'UltimateStormApiDiagnostics.cs').read_text(encoding='utf-8-sig', errors='ignore')
 verify_source = (ROOT / 'Core' / 'SpecialApiVerifier.cs').read_text(encoding='utf-8-sig', errors='ignore')
-for token in ('enable_debug', 'enable_console', 'console.log'):
+installer_source = (ROOT / 'Core' / 'ModdingApiInstaller.cs').read_text(encoding='utf-8-sig', errors='ignore')
+if 'InstallRuntimeProbe' not in installer_source:
+    errors.append('Phase 2C.3 must install the runtime probe without reinstalling the full ModdingAPI payload')
+for token in ('enable_debug', 'enable_console', 'console.log', 'nsc_api_probe_armed.txt', 'NSCApiRuntimeProbe.dll'):
     if token not in diag_source:
-        errors.append('Phase 2C.2 API diagnostics missing: ' + token)
+        errors.append('Phase 2C.3 API diagnostics missing: ' + token)
 for token in ('conditionprmManager.xfbin', 'specialCondParam.xfbin', 'ougiAwakeningParam.xfbin'):
     if token not in verify_source:
         errors.append('Phase 2C.2 special API verifier missing: ' + token)
+
+# 2g) Runtime probe is built as a tiny Windows x64 UltimateStormAPI plugin in CI.
+probe_source = (ROOT / 'native-win' / 'nsc_api_probe.c')
+if not probe_source.is_file():
+    errors.append('Phase 2C.3 runtime probe source missing')
+else:
+    probe_text = probe_source.read_text(encoding='utf-8-sig', errors='ignore')
+    for token in ('InitializePlugin', 'nsc_api_probe_dllmain.txt', 'nsc_api_probe_initialized.txt'):
+        if token not in probe_text:
+            errors.append('Phase 2C.3 runtime probe missing: ' + token)
 
 # 3) Validate bundled compiler baselines. A missing entry would only fail at
 # runtime on the phone, so fail the CI earlier here.
@@ -189,10 +202,10 @@ if message_zip.is_file():
         errors.append('invalid nsc_message_base.zip: ' + str(e))
 
 if errors:
-    print('Phase 2C.2 static validation FAILED:')
+    print('Phase 2C.3 static validation FAILED:')
     for e in errors: print(' -', e)
     sys.exit(1)
-print('Phase 2C.2 static validation OK')
+print('Phase 2C.3 static validation OK')
 print(f'  C# files: {sum(1 for _ in ROOT.rglob("*.cs"))}')
 print(f'  parameter baseline: {param_zip.stat().st_size:,} bytes')
 print(f'  ModdingAPI payload: {api_zip.stat().st_size:,} bytes')

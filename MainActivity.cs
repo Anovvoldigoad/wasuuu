@@ -72,7 +72,7 @@ public sealed class MainActivity : Activity
         scroll.AddView(root);
 
         root.AddView(new TextView(this) { Text = "NSC Mod Manager — Android ARM64", TextSize = 22 });
-        root.AddView(new TextView(this) { Text = "Phase 2C.2: generic compiler + special API verification/debug diagnostics + folder picker/cleanup. Native ARM64 CPK; no Winlator/Wine required." });
+        root.AddView(new TextView(this) { Text = "Phase 2C.3: generic compiler + deterministic UltimateStormAPI runtime probe + folder picker/cleanup. Native ARM64 CPK; no Winlator/Wine required." });
 
         root.AddView(new TextView(this) { Text = "Game directory" });
         _gamePath = new EditText(this) { Text = _prefs.GamePath, Hint = "/storage/.../Storm Connections" };
@@ -116,9 +116,14 @@ public sealed class MainActivity : Activity
         maintenance.AddView(MakeButton("Remove ModdingAPI", (_, _) => ConfirmRemoveModdingApi()));
         root.AddView(maintenance);
 
+        var apiProbe = Row();
+        apiProbe.AddView(MakeButton("Arm API Probe", (_, _) => ArmApiProbe()));
+        apiProbe.AddView(MakeButton("Check API Runtime", (_, _) => CheckApiRuntime()));
+        root.AddView(apiProbe);
+
         var apiDiagnostics = Row();
         apiDiagnostics.AddView(MakeButton("Toggle API Debug", (_, _) => ToggleApiDebug()));
-        apiDiagnostics.AddView(MakeButton("Export API Log", (_, _) => ExportApiLog()));
+        apiDiagnostics.AddView(MakeButton("Export API Diagnostics", (_, _) => ExportApiLog()));
         root.AddView(apiDiagnostics);
 
         var cpk = Row();
@@ -439,9 +444,9 @@ public sealed class MainActivity : Activity
             Directory.CreateDirectory(dir);
             string path = Path.Combine(dir, "nsc_android_last_error.txt");
             File.WriteAllText(path,
-                "NSC Mod Manager Android — Phase 2C.2 last compile error" + System.Environment.NewLine +
+                "NSC Mod Manager Android — Phase 2C.3 last compile error" + System.Environment.NewLine +
                 "Time: " + DateTime.Now.ToString("O") + System.Environment.NewLine +
-                "App: 0.4.2" + System.Environment.NewLine +
+                "App: 0.4.3" + System.Environment.NewLine +
                 "Game: " + game + System.Environment.NewLine + System.Environment.NewLine +
                 ex.ToString());
             return path;
@@ -453,6 +458,36 @@ public sealed class MainActivity : Activity
     }
 
 
+
+    void ArmApiProbe()
+    {
+        try
+        {
+            SaveGamePath();
+            var check = PathValidator.ValidateGamePath(_prefs.GamePath);
+            if (!check.Ok) { SetStatus(check.Message); return; }
+            string probe = Path.Combine(_prefs.GamePath, "moddingapi", "mods", "base_game", "NSCApiRuntimeProbe.dll");
+            if (!File.Exists(probe))
+                ModdingApiInstaller.InstallRuntimeProbe(_payloadZip, _prefs.GamePath);
+            UltimateStormApiDiagnostics.ArmProbe(_prefs.GamePath);
+            SetStatus("API probe armed. Fully close the game, launch it again, reproduce the issue, exit, then tap Check API Runtime.");
+        }
+        catch (Exception ex) { SetStatus("API probe arm failed: " + ex.Message); }
+    }
+
+    void CheckApiRuntime()
+    {
+        try
+        {
+            SaveGamePath();
+            var check = PathValidator.ValidateGamePath(_prefs.GamePath);
+            if (!check.Ok) { SetStatus(check.Message); return; }
+            ApiProbeStatus status = UltimateStormApiDiagnostics.GetProbeStatus(_prefs.GamePath);
+            SetStatus("API runtime " + status.State + ": " + status.Message);
+        }
+        catch (Exception ex) { SetStatus("API runtime check failed: " + ex.Message); }
+    }
+
     void ToggleApiDebug()
     {
         try
@@ -462,7 +497,7 @@ public sealed class MainActivity : Activity
             if (!check.Ok) { SetStatus(check.Message); return; }
             bool enabled = UltimateStormApiDiagnostics.ToggleDebug(_prefs.GamePath);
             SetStatus(enabled
-                ? "UltimateStormAPI debug enabled. Launch the game, reproduce the broken advanced jutsu, exit the game, then tap Export API Log."
+                ? "UltimateStormAPI debug enabled and runtime probe armed. Fully close/relaunch the game, reproduce the issue, then tap Check API Runtime."
                 : "UltimateStormAPI debug disabled.");
         }
         catch (Exception ex)
@@ -478,17 +513,19 @@ public sealed class MainActivity : Activity
             SaveGamePath();
             var check = PathValidator.ValidateGamePath(_prefs.GamePath);
             if (!check.Ok) { SetStatus(check.Message); return; }
-            string root = string.IsNullOrWhiteSpace(_prefs.ModsPath)
-                ? Path.Combine(Android.OS.Environment.ExternalStorageDirectory?.AbsolutePath ?? "/storage/emulated/0", "NSC-ModManager")
-                : _prefs.ModsPath;
-            string export = Path.Combine(root, "logs");
-            IReadOnlyList<string> files = UltimateStormApiDiagnostics.ExportLogs(_prefs.GamePath, export);
-            if (files.Count == 0)
+            string root;
+            if (string.IsNullOrWhiteSpace(_prefs.ModsPath))
+                root = Path.Combine(Android.OS.Environment.ExternalStorageDirectory?.AbsolutePath ?? "/storage/emulated/0", "NSC-ModManager");
+            else
             {
-                SetStatus("No UltimateStormAPI log found yet. Toggle API Debug ON, launch the game, reproduce the issue, then exit the game and export again.");
-                return;
+                string mods = _prefs.ModsPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                root = string.Equals(Path.GetFileName(mods), "mods", StringComparison.OrdinalIgnoreCase)
+                    ? (Path.GetDirectoryName(mods) ?? mods)
+                    : mods;
             }
-            SetStatus($"Exported {files.Count} API log file(s) to {export}");
+            string export = Path.Combine(root, "logs");
+            IReadOnlyList<string> files = UltimateStormApiDiagnostics.ExportDiagnostics(_prefs.GamePath, export);
+            SetStatus($"Exported {files.Count} API diagnostic file(s) to {export}");
         }
         catch (Exception ex)
         {

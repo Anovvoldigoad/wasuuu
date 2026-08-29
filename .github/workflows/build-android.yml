@@ -17,8 +17,36 @@ jobs:
       - name: Show .NET info
         run: dotnet --info
 
-      - name: Validate Phase 2C.2 portable source and payload
+      - name: Validate Phase 2C.3 portable source and payload
         run: python3 scripts/validate_phase2c.py
+
+      - name: Build UltimateStormAPI runtime probe (Windows x64)
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64
+          PROBE="$RUNNER_TEMP/NSCApiRuntimeProbe.dll"
+          x86_64-w64-mingw32-gcc native-win/nsc_api_probe.c -shared -Os -s -o "$PROBE" -lkernel32
+          file "$PROBE"
+          objdump -p "$PROBE" | grep -A20 'Export Tables' | grep -E 'InitializePlugin|GameLoop|ParseApiFiles' || true
+          python3 - "$PROBE" Assets/Payload/moddingapi_payload.zip <<'PY'
+          import sys, zipfile, tempfile, shutil, os
+          probe, payload = sys.argv[1:3]
+          entry = 'moddingapi/mods/base_game/NSCApiRuntimeProbe.dll'
+          fd, tmp = tempfile.mkstemp(suffix='.zip'); os.close(fd)
+          try:
+              with zipfile.ZipFile(payload, 'r') as src, zipfile.ZipFile(tmp, 'w', zipfile.ZIP_DEFLATED) as dst:
+                  for item in src.infolist():
+                      if item.filename != entry:
+                          dst.writestr(item, src.read(item.filename))
+                  dst.write(probe, entry)
+              shutil.move(tmp, payload)
+          finally:
+              if os.path.exists(tmp): os.unlink(tmp)
+          with zipfile.ZipFile(payload) as z:
+              assert entry in z.namelist() and z.getinfo(entry).file_size > 0
+              print(entry, z.getinfo(entry).file_size, 'bytes')
+          PY
 
       - name: Install .NET Android workload
         run: dotnet workload install android
@@ -63,7 +91,7 @@ jobs:
           echo "Native libraries visible inside project:"
           find . -type f -name '*.so' -not -path './obj/*' -not -path './bin/*' -print
 
-      - name: Verify Phase 2C.2 payload
+      - name: Verify Phase 2C.3 payload
         shell: bash
         run: |
           test -s Assets/Payload/moddingapi_payload.zip
@@ -71,6 +99,7 @@ jobs:
           test -s Assets/Payload/nsc_message_base.zip
           echo "Payload sizes:"
           ls -lh Assets/Payload/moddingapi_payload.zip Assets/Payload/nsc_param_base.zip Assets/Payload/nsc_message_base.zip
+          unzip -l Assets/Payload/moddingapi_payload.zip | grep -F 'moddingapi/mods/base_game/NSCApiRuntimeProbe.dll'
           SO_COUNT=$(find . -type f -name 'libcpkbridge.so' -not -path './obj/*' -not -path './bin/*' | wc -l)
           if [ "$SO_COUNT" -ne 1 ]; then
             echo "Expected exactly one libcpkbridge.so in project tree, got $SO_COUNT" >&2
@@ -116,15 +145,17 @@ jobs:
             find bin/Release -type f -name '*.apk' -print
             exit 1
           fi
-          cp "$SIGNED" artifact/NSC-ModManager-Android-Phase2C.2-Signed.apk
+          cp "$SIGNED" artifact/NSC-ModManager-Android-Phase2C.3-Signed.apk
           echo "Verifying APK contents..."
-          unzip -l artifact/NSC-ModManager-Android-Phase2C.2-Signed.apk | grep -F 'lib/arm64-v8a/libcpkbridge.so'
-          unzip -l artifact/NSC-ModManager-Android-Phase2C.2-Signed.apk | grep -F 'assets/Payload/moddingapi_payload.zip'
-          unzip -l artifact/NSC-ModManager-Android-Phase2C.2-Signed.apk | grep -F 'assets/Payload/nsc_param_base.zip'
-          unzip -l artifact/NSC-ModManager-Android-Phase2C.2-Signed.apk | grep -F 'assets/Payload/nsc_message_base.zip'
+          unzip -l artifact/NSC-ModManager-Android-Phase2C.3-Signed.apk | grep -F 'lib/arm64-v8a/libcpkbridge.so'
+          unzip -l artifact/NSC-ModManager-Android-Phase2C.3-Signed.apk | grep -F 'assets/Payload/moddingapi_payload.zip'
+          unzip -l artifact/NSC-ModManager-Android-Phase2C.3-Signed.apk | grep -F 'assets/Payload/nsc_param_base.zip'
+          unzip -l artifact/NSC-ModManager-Android-Phase2C.3-Signed.apk | grep -F 'assets/Payload/nsc_message_base.zip'
+          unzip -p artifact/NSC-ModManager-Android-Phase2C.3-Signed.apk assets/Payload/moddingapi_payload.zip > "$RUNNER_TEMP/moddingapi_payload_from_apk.zip"
+          unzip -l "$RUNNER_TEMP/moddingapi_payload_from_apk.zip" | grep -F 'moddingapi/mods/base_game/NSCApiRuntimeProbe.dll'
           ls -lah artifact
 
       - uses: actions/upload-artifact@v4
         with:
-          name: NSC-ModManager-Android-Phase2C.2-arm64-net10
+          name: NSC-ModManager-Android-Phase2C.3-arm64-net10
           path: artifact/*.apk
