@@ -18,7 +18,7 @@ Install/Test
 ------------
 - REMOVE/disable NSCApiDPadInternalTrace_v7_1.dll and older tracers first.
 - Keep d3dcompiler_47.dll unchanged.
-- Put NSCApiConditionCompatFix_v1.dll in moddingapi\\mods\\base_game\\
+- Put NSCApiConditionCompatFix_v2.dll in moddingapi\\mods\\base_game\\
 - Start the game and wait several seconds before entering battle.
 - Test Right D-Pad Izanagi and Left D-Pad.
 - Test the Ultimate/Kamui sequence.

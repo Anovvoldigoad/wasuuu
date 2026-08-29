@@ -1,4 +1,4 @@
-# NSC Mod Manager Android — v0.5.0 / Phase 2D
+# NSC Mod Manager Android — v0.5.1 / Phase 2D
 
 Native Android ARM64 port of the NSC ModManager workflow for Naruto X Boruto Ultimate Ninja STORM CONNECTIONS. The manager itself runs natively on Android; GameHub/Winlator is only used to run the Windows game.
 
@@ -10,7 +10,7 @@ Native Android ARM64 port of the NSC ModManager workflow for Naruto X Boruto Ult
 - UltimateStormAPI special parameter merge supports condition manager, special condition, and ougi/awakening files.
 
 ## Phase 2D: SC 1.70 runtime compatibility
-`NSCApiConditionCompatFix_v1.dll` is bundled into the ModdingAPI payload and installed automatically whenever the app compiles mods or installs/updates ModdingAPI.
+`NSCApiConditionCompatFix_v2.dll` is bundled into the ModdingAPI payload and installed automatically whenever the app compiles mods or installs/updates ModdingAPI.
 
 The runtime fix is generic: it derives condition counts from UltimateStormAPI runtime vectors and contains no character/mod IDs. It fixes an SC 1.70 condition-lookup signature mismatch found on the tested executable build.
 

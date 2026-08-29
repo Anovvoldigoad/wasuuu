@@ -5,11 +5,13 @@ namespace NSC_ModManager_Android.Core;
 
 public static class ModdingApiInstaller
 {
-    public const string ConditionCompatFixEntry = "moddingapi/mods/base_game/NSCApiConditionCompatFix_v1.dll";
-    public const string ConditionCompatFixSha256 = "e5ee5617a8c17f6431c34db6ace1a1ffcb1c8339735adb60471a73e0414983fa";
+    public const string ConditionCompatFixEntry = "moddingapi/mods/base_game/NSCApiConditionCompatFix_v2.dll";
+    public const string ConditionCompatFixSha256 = "cea719352b013579616b377df87ceb39037e7e0cfcb1fff32e93cb2fb9ceeef0";
 
     private static readonly string[] OwnedDiagnosticDlls =
     {
+        "NSCApiConditionCompatFix_v1.dll",
+        "NSCApiSpecialDPadAwakeningTrace_v1.dll",
         "NSCApiHookProbe.dll",
         "NSCApiActionTrace.dll",
         "NSCApiActionTrace_v3.dll",
@@ -57,7 +59,7 @@ public static class ModdingApiInstaller
     }
 
     public static string GetConditionCompatFixPath(string gamePath) =>
-        Path.Combine(gamePath, "moddingapi", "mods", "base_game", "NSCApiConditionCompatFix_v1.dll");
+        Path.Combine(gamePath, "moddingapi", "mods", "base_game", "NSCApiConditionCompatFix_v2.dll");
 
     public static bool IsConditionCompatFixInstalled(string gamePath)
     {

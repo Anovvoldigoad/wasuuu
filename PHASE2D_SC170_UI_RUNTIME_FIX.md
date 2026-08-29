@@ -1,7 +1,7 @@
 # Phase 2D — SC 1.70 Runtime Compatibility + Android UI refresh
 
 ## Runtime fix
-The Android payload now bundles `NSCApiConditionCompatFix_v1.dll` under
+The Android payload now bundles `NSCApiConditionCompatFix_v2.dll` under
 `moddingapi/mods/base_game/` and installs it automatically on both **Compile Mods**
 and **Install / Update ModdingAPI**.
 

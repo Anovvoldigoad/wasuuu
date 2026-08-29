@@ -1,0 +1,9 @@
+NSC Mod Manager Android v0.5.1 / Phase 2D BuildFix1 + Runtime Compat v2
+
+- Replaced NSCApiConditionCompatFix_v1.dll with NSCApiConditionCompatFix_v2.dll.
+- v2 retains the proven SC 1.70 dynamic condition lookup/count compatibility fix used by Tobi.
+- v2 also contains generic Awakening D-Pad persistence logic for specialCond-mapped characters.
+- No Isshiki/Tobi/character IDs are hardcoded.
+- Installer removes stale NSCApiConditionCompatFix_v1.dll and Special D-Pad tracer before verifying v2.
+- Bundled v2 SHA-256: cea719352b013579616b377df87ceb39037e7e0cfcb1fff32e93cb2fb9ceeef0
+- App display version 0.5.1; version code 17.

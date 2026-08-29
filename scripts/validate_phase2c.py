@@ -145,7 +145,7 @@ required_api = {
     'moddingapi/param/NSC/gudoBallParam.xfbin','moddingapi/param/NSC/conditionprmManager.xfbin',
     'moddingapi/param/NSC/partnerSlotParam.xfbin','moddingapi/param/NSC/susanooCondParam.xfbin',
     'moddingapi/param/NSC/ougiAwakeningParam.xfbin','moddingapi/param/NSC/bgmManagerParam.xfbin',
-    'moddingapi/mods/base_game/NSCApiConditionCompatFix_v1.dll',
+    'moddingapi/mods/base_game/NSCApiConditionCompatFix_v2.dll',
 }
 
 if param_zip.is_file():
@@ -182,11 +182,11 @@ if api_zip.is_file():
                 for marker in (b'GamepadDpadRight', b'GamepadDpadLeft', b'StageMove', b'OugiAwakeningParam'):
                     if marker not in api_dll:
                         errors.append('Bundled UltimateStormAPI runtime missing marker: ' + marker.decode('ascii'))
-            fix_name = 'moddingapi/mods/base_game/NSCApiConditionCompatFix_v1.dll'
+            fix_name = 'moddingapi/mods/base_game/NSCApiConditionCompatFix_v2.dll'
             if fix_name in names:
                 import hashlib
                 fix_hash = hashlib.sha256(z.read(fix_name)).hexdigest()
-                expected = 'e5ee5617a8c17f6431c34db6ace1a1ffcb1c8339735adb60471a73e0414983fa'
+                expected = 'cea719352b013579616b377df87ceb39037e7e0cfcb1fff32e93cb2fb9ceeef0'
                 if fix_hash != expected:
                     errors.append('SC 1.70 condition compatibility fix SHA-256 mismatch: ' + fix_hash)
     except zipfile.BadZipFile as e:

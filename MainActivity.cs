@@ -101,7 +101,7 @@ public sealed class MainActivity : Activity
         var sub = new TextView(this) { Text = "ANDROID ARM64  •  STORM CONNECTIONS", TextSize = 11 };
         sub.SetTextColor(Color.Rgb(122, 174, 255));
         titleCol.AddView(sub);
-        var version = new TextView(this) { Text = "v0.5.0  •  native compiler + UltimateStormAPI", TextSize = 11 };
+        var version = new TextView(this) { Text = "v0.5.1  •  native compiler + UltimateStormAPI", TextSize = 11 };
         version.SetTextColor(Color.Rgb(166, 174, 192));
         titleCol.AddView(version);
         headerRow.AddView(titleCol, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1));
@@ -608,9 +608,9 @@ public sealed class MainActivity : Activity
             Directory.CreateDirectory(dir);
             string path = IOPath.Combine(dir, "nsc_android_last_error.txt");
             File.WriteAllText(path,
-                "NSC Mod Manager Android — v0.5.0 last compile error" + System.Environment.NewLine +
+                "NSC Mod Manager Android — v0.5.1 last compile error" + System.Environment.NewLine +
                 "Time: " + DateTime.Now.ToString("O") + System.Environment.NewLine +
-                "App: 0.5.0" + System.Environment.NewLine +
+                "App: 0.5.1" + System.Environment.NewLine +
                 "Game: " + game + System.Environment.NewLine + System.Environment.NewLine +
                 ex.ToString());
             return path;
