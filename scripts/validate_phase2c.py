@@ -78,7 +78,7 @@ for lang in ('arae','chi','eng','esmx','fre','ger','idid','ita','kokr','pol','po
 main_activity = (ROOT / 'MainActivity.cs').read_text(encoding='utf-8-sig', errors='ignore')
 cleanup_source = (ROOT / 'Core' / 'GameCleanup.cs').read_text(encoding='utf-8-sig', errors='ignore')
 folder_source = (ROOT / 'Core' / 'AndroidFolderPathResolver.cs').read_text(encoding='utf-8-sig', errors='ignore')
-for token in ('Intent.ActionOpenDocumentTree', 'PickGameFolderRequest', 'Clear Compiled Mods', 'Remove ModdingAPI', 'Arm API Probe', 'Check API Runtime', 'Toggle API Debug', 'Export API Diagnostics'):
+for token in ('Intent.ActionOpenDocumentTree', 'PickGameFolderRequest', 'ConfirmClearCompiledMods', 'Remove ModdingAPI', 'Arm API Probe', 'Check Runtime', 'Toggle API Debug', 'ExportApiLog'):
     if token not in main_activity:
         errors.append('Phase 2C.2 UI feature missing: ' + token)
 for token in ('RegisterManagedFile', 'ClearCompiledMods', 'RemoveModdingApi', '.nscmm_android.bak'):
@@ -145,6 +145,7 @@ required_api = {
     'moddingapi/param/NSC/gudoBallParam.xfbin','moddingapi/param/NSC/conditionprmManager.xfbin',
     'moddingapi/param/NSC/partnerSlotParam.xfbin','moddingapi/param/NSC/susanooCondParam.xfbin',
     'moddingapi/param/NSC/ougiAwakeningParam.xfbin','moddingapi/param/NSC/bgmManagerParam.xfbin',
+    'moddingapi/mods/base_game/NSCApiConditionCompatFix_v1.dll',
 }
 
 if param_zip.is_file():
@@ -181,6 +182,13 @@ if api_zip.is_file():
                 for marker in (b'GamepadDpadRight', b'GamepadDpadLeft', b'StageMove', b'OugiAwakeningParam'):
                     if marker not in api_dll:
                         errors.append('Bundled UltimateStormAPI runtime missing marker: ' + marker.decode('ascii'))
+            fix_name = 'moddingapi/mods/base_game/NSCApiConditionCompatFix_v1.dll'
+            if fix_name in names:
+                import hashlib
+                fix_hash = hashlib.sha256(z.read(fix_name)).hexdigest()
+                expected = 'e5ee5617a8c17f6431c34db6ace1a1ffcb1c8339735adb60471a73e0414983fa'
+                if fix_hash != expected:
+                    errors.append('SC 1.70 condition compatibility fix SHA-256 mismatch: ' + fix_hash)
     except zipfile.BadZipFile as e:
         errors.append('invalid moddingapi_payload.zip: ' + str(e))
 
@@ -202,10 +210,10 @@ if message_zip.is_file():
         errors.append('invalid nsc_message_base.zip: ' + str(e))
 
 if errors:
-    print('Phase 2C.3 static validation FAILED:')
+    print('Phase 2D static validation FAILED:')
     for e in errors: print(' -', e)
     sys.exit(1)
-print('Phase 2C.3 static validation OK')
+print('Phase 2D static validation OK')
 print(f'  C# files: {sum(1 for _ in ROOT.rglob("*.cs"))}')
 print(f'  parameter baseline: {param_zip.stat().st_size:,} bytes')
 print(f'  ModdingAPI payload: {api_zip.stat().st_size:,} bytes')

@@ -49,7 +49,7 @@ public static class UltimateStormApiDiagnostics
     {
         string probeDll = Path.Combine(gamePath, "moddingapi", "mods", "base_game", "NSCApiRuntimeProbe.dll");
         if (!File.Exists(probeDll))
-            return new("PROBE_NOT_INSTALLED", "Runtime probe DLL is not installed. Run Install / Update ModdingAPI from Phase 2C.3, then arm the probe.", false, false);
+            return new("PROBE_NOT_INSTALLED", "Runtime probe DLL is not installed. Run Install / Update ModdingAPI from v0.5.0, then arm the probe.", false, false);
 
         string arm = Path.Combine(gamePath, ArmMarker);
         DateTime armUtc = File.Exists(arm) ? File.GetLastWriteTimeUtc(arm) : DateTime.MinValue;

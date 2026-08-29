@@ -1,0 +1,28 @@
+NSC Mod Manager Android v0.5.0 / Phase 2D
+
+Runtime
+- Bundled tested NSCApiConditionCompatFix_v1.dll into ModdingAPI payload.
+- Installer SHA-256 validation before and after install.
+- Automatic installation during Compile Mods and Install / Update ModdingAPI.
+- Exact-name cleanup for temporary diagnostic DLLs from the SC 1.70 debugging session.
+- Runtime fix remains generic; no Tobi/mtob/characode hardcode in Android core.
+
+UI
+- New adaptive launcher icon.
+- Dark panel-based interface inspired by desktop NSC Mod Manager.
+- Native animated storm/chakra Canvas background.
+- Runtime compatibility status badge.
+- Reorganized Game Setup / Mod Library / Compile & Runtime / Advanced Tools / Status.
+
+Build/CI
+- App display version 0.5.0; version code 16.
+- GitHub Actions artifact renamed for v0.5.0.
+- CI verifies the condition compatibility DLL is present in payload/APK.
+- Static validator verifies tested SHA-256.
+
+Testing
+- Added MOD_COMPAT_TEST_CHECKLIST.md for testing additional mods.
+5b5a32d40008c744e40f05e615cec91ed398021c7ee03826b36fef5b392ec8a4  Assets/Payload/moddingapi_payload.zip
+dede3177305f570be5573dfaf370f8a6ca4b8e77de4e81263551d270e699897e  native-win/nsc_condition_compat_fix.cpp
+21a0693964d5ce655a720810921e19e67ba1fc941cd7812a69494e4e9acefa5c  MainActivity.cs
+29dda60c57329fa97fff7ecd0242704795ec0a72969f3eec732fec4d04287c58  Core/ModdingApiInstaller.cs

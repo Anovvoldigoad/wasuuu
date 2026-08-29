@@ -6,6 +6,8 @@ using Android.OS;
 using Android.Provider;
 using Android.Views;
 using Android.Widget;
+using Android.Graphics;
+using Android.Graphics.Drawables;
 using NSC_ModManager_Android.Core;
 
 namespace NSC_ModManager_Android;
@@ -20,6 +22,7 @@ public sealed class MainActivity : Activity
     EditText _modsPath = null!;
     ListView _list = null!;
     TextView _status = null!;
+    TextView _runtimeFixBadge = null!;
     Button _compileButton = null!;
     readonly ModRepository _repo = new();
     readonly ModInstaller _installer = new();
@@ -66,88 +69,246 @@ public sealed class MainActivity : Activity
 
     void BuildUi()
     {
-        var scroll = new ScrollView(this);
+        Window?.SetStatusBarColor(Color.Rgb(7, 10, 16));
+        Window?.SetNavigationBarColor(Color.Rgb(7, 10, 16));
+
+        var shell = new FrameLayout(this);
+        shell.SetBackgroundColor(Color.Rgb(7, 10, 16));
+        shell.AddView(new StormBackdropView(this), new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+
+        var scroll = new ScrollView(this) { FillViewport = true };
+        scroll.VerticalScrollBarEnabled = false;
         var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        root.SetPadding(24, 24, 24, 24);
+        root.SetPadding(Dp(16), Dp(18), Dp(16), Dp(36));
         scroll.AddView(root);
+        shell.AddView(scroll, new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
 
-        root.AddView(new TextView(this) { Text = "NSC Mod Manager — Android ARM64", TextSize = 22 });
-        root.AddView(new TextView(this) { Text = "Phase 2C.3: generic compiler + deterministic UltimateStormAPI runtime probe + folder picker/cleanup. Native ARM64 CPK; no Winlator/Wine required." });
+        var header = Panel();
+        var headerRow = Row();
+        var logo = new ImageView(this);
+        logo.SetImageResource(Resource.Drawable.ic_launcher_foreground);
+        logo.SetPadding(Dp(2), Dp(2), Dp(2), Dp(2));
+        headerRow.AddView(logo, new LinearLayout.LayoutParams(Dp(72), Dp(72)) { RightMargin = Dp(12) });
+        var titleCol = new LinearLayout(this) { Orientation = Orientation.Vertical, Gravity = GravityFlags.CenterVertical };
+        var title = new TextView(this) { Text = "NSC MOD MANAGER", TextSize = 23 };
+        title.SetTextColor(Color.White);
+        title.SetTypeface(Android.Graphics.Typeface.Default, Android.Graphics.TypefaceStyle.Bold);
+        titleCol.AddView(title);
+        var sub = new TextView(this) { Text = "ANDROID ARM64  •  STORM CONNECTIONS", TextSize = 11 };
+        sub.SetTextColor(Color.Rgb(122, 174, 255));
+        titleCol.AddView(sub);
+        var version = new TextView(this) { Text = "v0.5.0  •  native compiler + UltimateStormAPI", TextSize = 11 };
+        version.SetTextColor(Color.Rgb(166, 174, 192));
+        titleCol.AddView(version);
+        headerRow.AddView(titleCol, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1));
+        header.AddView(headerRow);
 
-        root.AddView(new TextView(this) { Text = "Game directory" });
-        _gamePath = new EditText(this) { Text = _prefs.GamePath, Hint = "/storage/.../Storm Connections" };
-        root.AddView(_gamePath);
+        var badgeRow = Row();
+        _runtimeFixBadge = Badge("SC 1.70 FIX  •  BUNDLED", Color.Rgb(79, 130, 220));
+        badgeRow.AddView(_runtimeFixBadge, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1) { RightMargin = Dp(6) });
+        var nativeBadge = Badge("ARM64 CPK  •  NATIVE", Color.Rgb(115, 87, 190));
+        badgeRow.AddView(nativeBadge, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1) { LeftMargin = Dp(6) });
+        header.AddView(badgeRow);
+        AddPanel(root, header);
 
+        var game = Panel();
+        AddSectionTitle(game, "GAME SETUP");
+        game.AddView(Description("Pilih folder root Storm Connections. Runtime compatibility fix SC 1.70 akan dipasang otomatis bersama ModdingAPI."));
+        game.AddView(FieldLabel("Game directory"));
+        _gamePath = StyledEditText(_prefs.GamePath, "/storage/.../Storm Connections");
+        game.AddView(_gamePath);
         var gameRow = Row();
-        gameRow.AddView(MakeButton("Select Game Folder", (_, _) => PickGameFolder()));
-        gameRow.AddView(MakeButton("Save / Check Path", (_, _) => SaveGamePath()));
-        root.AddView(gameRow);
-
+        gameRow.AddView(MakeButton("Select Folder", (_, _) => PickGameFolder(), true));
+        gameRow.AddView(MakeButton("Save / Check", (_, _) => SaveGamePath()));
+        game.AddView(gameRow);
         var storageRow = Row();
         storageRow.AddView(MakeButton("Storage Access", (_, _) => RequestAllFilesAccess()));
-        root.AddView(storageRow);
+        game.AddView(storageRow);
+        AddPanel(root, game);
 
-        root.AddView(new TextView(this) { Text = "Mod storage directory" });
-        _modsPath = new EditText(this) { Text = _prefs.ModsPath };
-        root.AddView(_modsPath);
-
+        var mods = Panel();
+        AddSectionTitle(mods, "MOD LIBRARY");
+        mods.AddView(FieldLabel("Mod storage directory"));
+        _modsPath = StyledEditText(_prefs.ModsPath, "/storage/emulated/0/NSC-ModManager/mods");
+        mods.AddView(_modsPath);
         var modButtons = Row();
-        modButtons.AddView(MakeButton("Install Mod", (_, _) => PickMod()));
+        modButtons.AddView(MakeButton("Install Mod", (_, _) => PickMod(), true));
         modButtons.AddView(MakeButton("Refresh", (_, _) => RefreshMods()));
-        root.AddView(modButtons);
+        mods.AddView(modButtons);
 
         _list = new ListView(this) { ChoiceMode = ChoiceMode.Single };
-        _list.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 500);
-        root.AddView(_list);
-
+        _list.SetBackgroundDrawable(RoundRect(Color.Argb(205, 13, 17, 26), Dp(12), Color.Argb(120, 86, 111, 157), Dp(1)));
+        _list.Divider = new ColorDrawable(Color.Argb(70, 120, 150, 200));
+        _list.DividerHeight = 1;
+        _list.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, Dp(300))
+        {
+            TopMargin = Dp(8), BottomMargin = Dp(8)
+        };
+        mods.AddView(_list);
         var actions = Row();
-        actions.AddView(MakeButton("Toggle", (_, _) => ToggleSelected()));
+        actions.AddView(MakeButton("Enable / Disable", (_, _) => ToggleSelected()));
         actions.AddView(MakeButton("Delete", (_, _) => DeleteSelected()));
-        root.AddView(actions);
+        mods.AddView(actions);
+        AddPanel(root, mods);
 
+        var runtime = Panel();
+        AddSectionTitle(runtime, "COMPILE & RUNTIME");
+        runtime.AddView(Description("Compile menggabungkan resource/parameter mod, memasang UltimateStormAPI, lalu mengaktifkan SC 1.70 condition compatibility fix secara otomatis."));
         var compilerActions = Row();
-        _compileButton = MakeButton("Compile Mods", async (_, _) => await CompileModsAsync());
+        _compileButton = MakeButton("COMPILE MODS", async (_, _) => await CompileModsAsync(), true);
         compilerActions.AddView(_compileButton);
-        compilerActions.AddView(MakeButton("Install / Update ModdingAPI", (_, _) => InstallModdingApiOnly()));
-        root.AddView(compilerActions);
-
+        compilerActions.AddView(MakeButton("Install / Update API", (_, _) => InstallModdingApiOnly()));
+        runtime.AddView(compilerActions);
         var maintenance = Row();
-        maintenance.AddView(MakeButton("Clear Compiled Mods", (_, _) => ConfirmClearCompiledMods()));
-        maintenance.AddView(MakeButton("Remove ModdingAPI", (_, _) => ConfirmRemoveModdingApi()));
-        root.AddView(maintenance);
+        maintenance.AddView(MakeButton("Clear Compiled", (_, _) => ConfirmClearCompiledMods()));
+        maintenance.AddView(MakeButton("Remove API", (_, _) => ConfirmRemoveModdingApi()));
+        runtime.AddView(maintenance);
+        AddPanel(root, runtime);
 
+        var tools = Panel();
+        AddSectionTitle(tools, "ADVANCED TOOLS");
         var apiProbe = Row();
         apiProbe.AddView(MakeButton("Arm API Probe", (_, _) => ArmApiProbe()));
-        apiProbe.AddView(MakeButton("Check API Runtime", (_, _) => CheckApiRuntime()));
-        root.AddView(apiProbe);
-
+        apiProbe.AddView(MakeButton("Check Runtime", (_, _) => CheckApiRuntime()));
+        tools.AddView(apiProbe);
         var apiDiagnostics = Row();
         apiDiagnostics.AddView(MakeButton("Toggle API Debug", (_, _) => ToggleApiDebug()));
-        apiDiagnostics.AddView(MakeButton("Export API Diagnostics", (_, _) => ExportApiLog()));
-        root.AddView(apiDiagnostics);
-
+        apiDiagnostics.AddView(MakeButton("Export Diagnostics", (_, _) => ExportApiLog()));
+        tools.AddView(apiDiagnostics);
         var cpk = Row();
         cpk.AddView(MakeButton("CPK Pack + Extract Self-Test", (_, _) => CpkSelfTest()));
-        root.AddView(cpk);
+        tools.AddView(cpk);
+        AddPanel(root, tools);
 
-        _status = new TextView(this) { Text = "Ready" };
+        var statusPanel = Panel();
+        AddSectionTitle(statusPanel, "STATUS");
+        _status = new TextView(this) { Text = "Ready", TextSize = 13 };
+        _status.SetTextColor(Color.Rgb(218, 228, 244));
         _status.SetTextIsSelectable(true);
-        _status.SetPadding(0, 12, 0, 48);
-        root.AddView(_status);
-        SetContentView(scroll);
+        _status.SetPadding(Dp(12), Dp(12), Dp(12), Dp(12));
+        _status.SetBackgroundDrawable(RoundRect(Color.Argb(210, 5, 8, 14), Dp(10), Color.Argb(100, 103, 142, 202), Dp(1)));
+        statusPanel.AddView(_status);
+        AddPanel(root, statusPanel);
+
+        SetContentView(shell);
+        UpdateRuntimeFixBadge();
     }
 
-    LinearLayout Row() => new(this) { Orientation = Orientation.Horizontal };
+    int Dp(int value) => (int)(value * Resources!.DisplayMetrics!.Density + 0.5f);
 
-    Button MakeButton(string text, EventHandler click)
+    LinearLayout Row() => new(this)
     {
-        var b = new Button(this) { Text = text };
+        Orientation = Orientation.Horizontal,
+        Gravity = GravityFlags.CenterVertical
+    };
+
+    LinearLayout Panel()
+    {
+        var panel = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        panel.SetPadding(Dp(14), Dp(14), Dp(14), Dp(14));
+        panel.SetBackgroundDrawable(RoundRect(Color.Argb(232, 16, 20, 30), Dp(16), Color.Argb(120, 91, 120, 170), Dp(1)));
+        panel.Elevation = Dp(2);
+        return panel;
+    }
+
+    void AddPanel(LinearLayout root, View panel)
+    {
+        root.AddView(panel, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent)
+        {
+            BottomMargin = Dp(12)
+        });
+    }
+
+    void AddSectionTitle(LinearLayout parent, string text)
+    {
+        var label = new TextView(this) { Text = text, TextSize = 12 };
+        label.SetTextColor(Color.Rgb(118, 174, 255));
+        label.SetTypeface(Android.Graphics.Typeface.Default, Android.Graphics.TypefaceStyle.Bold);
+        label.SetPadding(0, 0, 0, Dp(8));
+        parent.AddView(label);
+    }
+
+    TextView Description(string text)
+    {
+        var v = new TextView(this) { Text = text, TextSize = 12 };
+        v.SetTextColor(Color.Rgb(171, 181, 199));
+        v.SetPadding(0, 0, 0, Dp(10));
+        return v;
+    }
+
+    TextView FieldLabel(string text)
+    {
+        var v = new TextView(this) { Text = text, TextSize = 12 };
+        v.SetTextColor(Color.Rgb(211, 219, 234));
+        v.SetPadding(0, Dp(6), 0, Dp(4));
+        return v;
+    }
+
+    EditText StyledEditText(string text, string hint)
+    {
+        var edit = new EditText(this) { Text = text, Hint = hint, TextSize = 13 };
+        edit.SetSingleLine(true);
+        edit.SetTextColor(Color.White);
+        edit.SetHintTextColor(Color.Rgb(105, 115, 133));
+        edit.SetPadding(Dp(12), Dp(8), Dp(12), Dp(8));
+        edit.SetBackgroundDrawable(RoundRect(Color.Argb(225, 7, 10, 17), Dp(10), Color.Argb(105, 93, 132, 190), Dp(1)));
+        edit.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent)
+        {
+            BottomMargin = Dp(6)
+        };
+        return edit;
+    }
+
+    Button MakeButton(string text, EventHandler click, bool primary = false)
+    {
+        var b = new Button(this) { Text = text, TextSize = 11 };
+        b.SetAllCaps(false);
         b.Click += click;
-        b.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
+        b.SetTextColor(Color.White);
+        b.SetPadding(Dp(8), 0, Dp(8), 0);
+        Color fill = primary ? Color.Rgb(45, 100, 186) : Color.Rgb(31, 39, 55);
+        Color stroke = primary ? Color.Rgb(116, 176, 255) : Color.Rgb(79, 98, 130);
+        b.SetBackgroundDrawable(RoundRect(fill, Dp(10), stroke, Dp(1)));
+        b.LayoutParameters = new LinearLayout.LayoutParams(0, Dp(48), 1)
+        {
+            LeftMargin = Dp(3), RightMargin = Dp(3), TopMargin = Dp(4), BottomMargin = Dp(4)
+        };
         return b;
     }
 
-    void SetStatus(string text) => _status.Text = $"{DateTime.Now:HH:mm:ss}  {text}";
+    TextView Badge(string text, Color fill)
+    {
+        var b = new TextView(this) { Text = text, TextSize = 10, Gravity = GravityFlags.Center };
+        b.SetTextColor(Color.White);
+        b.SetPadding(Dp(8), Dp(7), Dp(8), Dp(7));
+        b.SetBackgroundDrawable(RoundRect(Color.Argb(150, fill.R, fill.G, fill.B), Dp(20), Color.Argb(210, fill.R, fill.G, fill.B), Dp(1)));
+        return b;
+    }
+
+    GradientDrawable RoundRect(Color fill, int radius, Color stroke, int strokeWidth)
+    {
+        var d = new GradientDrawable();
+        d.SetColor(fill);
+        d.SetCornerRadius(radius);
+        if (strokeWidth > 0) d.SetStroke(strokeWidth, stroke);
+        return d;
+    }
+
+    void UpdateRuntimeFixBadge()
+    {
+        if (_runtimeFixBadge is null) return;
+        string path = _gamePath?.Text?.Trim() ?? _prefs.GamePath;
+        bool installed = !string.IsNullOrWhiteSpace(path) && Directory.Exists(path) && ModdingApiInstaller.IsConditionCompatFixInstalled(path);
+        _runtimeFixBadge.Text = installed ? "SC 1.70 FIX  •  INSTALLED" : "SC 1.70 FIX  •  READY";
+    }
+
+    void SetStatus(string text)
+    {
+        _status.Text = $"{DateTime.Now:HH:mm:ss}  {text}";
+        UpdateRuntimeFixBadge();
+    }
 
     void RequestAllFilesAccess()
     {
@@ -444,9 +605,9 @@ public sealed class MainActivity : Activity
             Directory.CreateDirectory(dir);
             string path = Path.Combine(dir, "nsc_android_last_error.txt");
             File.WriteAllText(path,
-                "NSC Mod Manager Android — Phase 2C.3 last compile error" + System.Environment.NewLine +
+                "NSC Mod Manager Android — v0.5.0 last compile error" + System.Environment.NewLine +
                 "Time: " + DateTime.Now.ToString("O") + System.Environment.NewLine +
-                "App: 0.4.3" + System.Environment.NewLine +
+                "App: 0.5.0" + System.Environment.NewLine +
                 "Game: " + game + System.Environment.NewLine + System.Environment.NewLine +
                 ex.ToString());
             return path;
@@ -564,5 +725,64 @@ public sealed class MainActivity : Activity
         }
         catch (DllNotFoundException) { SetStatus("libcpkbridge.so missing. Build through included GitHub Action."); }
         catch (Exception ex) { SetStatus("CPK test failed: " + ex.Message); }
+    }
+}
+
+internal sealed class StormBackdropView : View
+{
+    readonly Paint _particle = new(PaintFlags.AntiAlias);
+    readonly Paint _line = new(PaintFlags.AntiAlias);
+    readonly float[] _px = new float[34];
+    readonly float[] _py = new float[34];
+    readonly float[] _speed = new float[34];
+
+    public StormBackdropView(Context context) : base(context)
+    {
+        SetLayerType(LayerType.Software, null);
+        var random = new Random(170);
+        for (int i = 0; i < _px.Length; i++)
+        {
+            _px[i] = (float)random.NextDouble();
+            _py[i] = (float)random.NextDouble();
+            _speed[i] = 0.018f + (float)random.NextDouble() * 0.045f;
+        }
+        _line.StrokeWidth = 1.2f;
+    }
+
+    protected override void OnDraw(Canvas canvas)
+    {
+        base.OnDraw(canvas);
+        if (Width <= 0 || Height <= 0) return;
+
+        long now = SystemClock.ElapsedRealtime();
+        float t = (now % 120000L) / 1000f;
+
+        _particle.Color = Color.Argb(70, 75, 137, 235);
+        for (int i = 0; i < _px.Length; i++)
+        {
+            float x = ((_px[i] + t * _speed[i]) % 1f) * Width;
+            float y = ((_py[i] + t * _speed[(_px.Length - 1) - i] * 0.34f) % 1f) * Height;
+            float r = 1.2f + (i % 4) * 0.55f;
+            canvas.DrawCircle(x, y, r, _particle);
+        }
+
+        float cx = Width * 0.78f;
+        float cy = Height * 0.18f;
+        for (int i = 0; i < 4; i++)
+        {
+            int alpha = 28 - i * 5;
+            _line.Color = Color.Argb(alpha, 137, 109, 255);
+            _line.SetStyle(Paint.Style.Stroke);
+            float radius = Width * (0.22f + i * 0.085f) + (float)Math.Sin(t * 0.55f + i) * 14f;
+            canvas.DrawCircle(cx, cy, radius, _line);
+        }
+
+        _line.Color = Color.Argb(20, 90, 153, 255);
+        _line.StrokeWidth = 2.2f;
+        float offset = (t * 38f) % (Width + 260f) - 130f;
+        canvas.DrawLine(offset, Height * 0.65f, offset + 260f, Height * 0.35f, _line);
+        canvas.DrawLine(offset - 180f, Height * 0.82f, offset + 120f, Height * 0.48f, _line);
+
+        PostInvalidateOnAnimation();
     }
 }
