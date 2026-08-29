@@ -25,6 +25,8 @@ public sealed class MainActivity : Activity
     TextView _status = null!;
     TextView _runtimeFixBadge = null!;
     Button _compileButton = null!;
+    bool? _rootFixInstalledCache;
+    bool? _safFixInstalledCache;
     readonly ModRepository _repo = new();
     readonly ModInstaller _installer = new();
     readonly AndroidCompiler _compiler = new();
@@ -39,6 +41,8 @@ public sealed class MainActivity : Activity
         _prefs = new AndroidPrefs(this);
         BootstrapAssets();
         BuildUi();
+        if (_prefs.GameMode == GameAccessMode.RootPath) RefreshRootFixCache();
+        else if (_prefs.GameMode == GameAccessMode.SafDocumentTree) RefreshSafFixCache();
         RefreshMods();
     }
 
@@ -101,7 +105,7 @@ public sealed class MainActivity : Activity
         var sub = new TextView(this) { Text = "ANDROID ARM64  •  STORM CONNECTIONS", TextSize = 11 };
         sub.SetTextColor(Color.Rgb(122, 174, 255));
         titleCol.AddView(sub);
-        var version = new TextView(this) { Text = "v0.5.1  •  native compiler + UltimateStormAPI", TextSize = 11 };
+        var version = new TextView(this) { Text = "v0.5.3  •  native compiler + Winlator SAF direct", TextSize = 11 };
         version.SetTextColor(Color.Rgb(166, 174, 192));
         titleCol.AddView(version);
         headerRow.AddView(titleCol, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1));
@@ -117,15 +121,16 @@ public sealed class MainActivity : Activity
 
         var game = Panel();
         AddSectionTitle(game, "GAME SETUP");
-        game.AddView(Description("Pilih folder root Storm Connections. Runtime compatibility fix SC 1.70 akan dipasang otomatis bersama ModdingAPI."));
+        game.AddView(Description("Pilih folder Storm Connections lewat Android picker. Storage biasa memakai direct path; provider Winlator otomatis memakai SAF direct read/write ke C: tanpa root. ROOT / WINLATOR C: tetap tersedia sebagai opsi advanced."));
         game.AddView(FieldLabel("Game directory"));
-        _gamePath = StyledEditText(_prefs.GamePath, "/storage/.../Storm Connections");
+        _gamePath = StyledEditText(CurrentGameTargetText(), "/storage/... atau Winlator DocumentsProvider...");
         game.AddView(_gamePath);
         var gameRow = Row();
-        gameRow.AddView(MakeButton("Select Folder", (_, _) => PickGameFolder(), true));
-        gameRow.AddView(MakeButton("Save / Check", (_, _) => SaveGamePath()));
+        gameRow.AddView(MakeButton("Select Folder / Winlator", (_, _) => PickGameFolder(), true));
+        gameRow.AddView(MakeButton("ROOT / WINLATOR C:", async (_, _) => await PickRootWinlatorFolderAsync(), true));
         game.AddView(gameRow);
         var storageRow = Row();
+        storageRow.AddView(MakeButton("Save / Check", (_, _) => SaveGamePath()));
         storageRow.AddView(MakeButton("Storage Access", (_, _) => RequestAllFilesAccess()));
         game.AddView(storageRow);
         AddPanel(root, game);
@@ -299,12 +304,58 @@ public sealed class MainActivity : Activity
         return d;
     }
 
+    string CurrentGameTargetText()
+    {
+        return _prefs.GameMode switch
+        {
+            GameAccessMode.SafDocumentTree => string.IsNullOrWhiteSpace(_prefs.GameDisplayPath) ? "Winlator SAF game folder" : _prefs.GameDisplayPath,
+            _ => _prefs.GamePath
+        };
+    }
+
+    ContentResolver RequireContentResolver()
+        => ContentResolver ?? throw new InvalidOperationException("Android ContentResolver is unavailable.");
+
     void UpdateRuntimeFixBadge()
     {
         if (_runtimeFixBadge is null) return;
-        string path = _gamePath?.Text?.Trim() ?? _prefs.GamePath;
-        bool installed = !string.IsNullOrWhiteSpace(path) && Directory.Exists(path) && ModdingApiInstaller.IsConditionCompatFixInstalled(path);
-        _runtimeFixBadge.Text = installed ? "SC 1.70 FIX  •  INSTALLED" : "SC 1.70 FIX  •  READY";
+        bool installed = _prefs.GameMode switch
+        {
+            GameAccessMode.RootPath => _rootFixInstalledCache ?? false,
+            GameAccessMode.SafDocumentTree => _safFixInstalledCache ?? false,
+            _ => !string.IsNullOrWhiteSpace(_prefs.GamePath)
+                 && Directory.Exists(_prefs.GamePath)
+                 && ModdingApiInstaller.IsConditionCompatFixInstalled(_prefs.GamePath)
+        };
+
+        _runtimeFixBadge.Text = _prefs.GameMode switch
+        {
+            GameAccessMode.RootPath => installed ? "SC 1.70 FIX  •  ROOT INSTALLED" : "ROOT MODE  •  READY",
+            GameAccessMode.SafDocumentTree => installed ? "SC 1.70 FIX  •  SAF INSTALLED" : "WINLATOR SAF  •  READY",
+            _ => installed ? "SC 1.70 FIX  •  INSTALLED" : "SC 1.70 FIX  •  READY"
+        };
+    }
+
+    void RefreshRootFixCache()
+    {
+        if (_prefs.GameMode != GameAccessMode.RootPath || string.IsNullOrWhiteSpace(_prefs.GamePath))
+        {
+            _rootFixInstalledCache = null;
+            return;
+        }
+        try { _rootFixInstalledCache = RootShell.IsAvailable(out _) && RootGameBridge.IsConditionFixPresent(_prefs.GamePath); }
+        catch { _rootFixInstalledCache = false; }
+    }
+
+    void RefreshSafFixCache()
+    {
+        if (_prefs.GameMode != GameAccessMode.SafDocumentTree || string.IsNullOrWhiteSpace(_prefs.GameTreeUri))
+        {
+            _safFixInstalledCache = null;
+            return;
+        }
+        try { _safFixInstalledCache = SafGameBridge.IsConditionFixPresent(RequireContentResolver(), _prefs.GameTreeUri); }
+        catch { _safFixInstalledCache = false; }
     }
 
     void SetStatus(string text)
@@ -335,10 +386,34 @@ public sealed class MainActivity : Activity
 
     void SaveGamePath()
     {
-        _prefs.GamePath = _gamePath.Text?.Trim() ?? "";
         _prefs.ModsPath = _modsPath.Text?.Trim() ?? "";
-        var check = PathValidator.ValidateGamePath(_prefs.GamePath);
-        SetStatus(check.Message);
+        if (_prefs.GameMode != GameAccessMode.SafDocumentTree)
+            _prefs.GamePath = _gamePath.Text?.Trim() ?? "";
+
+        var check = ValidateCurrentGamePath();
+        if (check.Ok)
+        {
+            if (_prefs.GameMode == GameAccessMode.RootPath) RefreshRootFixCache();
+            else if (_prefs.GameMode == GameAccessMode.SafDocumentTree) RefreshSafFixCache();
+        }
+
+        string mode = _prefs.GameMode switch
+        {
+            GameAccessMode.RootPath => "ROOT / Winlator C: | ",
+            GameAccessMode.SafDocumentTree => "Winlator SAF direct | ",
+            _ => "Storage | "
+        };
+        SetStatus(mode + check.Message);
+    }
+
+    (bool Ok, string Message) ValidateCurrentGamePath()
+    {
+        return _prefs.GameMode switch
+        {
+            GameAccessMode.RootPath => RootShell.ValidateGamePath(_prefs.GamePath),
+            GameAccessMode.SafDocumentTree => SafGameBridge.ValidateGamePath(RequireContentResolver(), _prefs.GameTreeUri),
+            _ => PathValidator.ValidateGamePath(_prefs.GamePath)
+        };
     }
 
     void PickGameFolder()
@@ -356,6 +431,111 @@ public sealed class MainActivity : Activity
         {
             SetStatus("Folder picker failed: " + ex.Message);
         }
+    }
+
+    async Task PickRootWinlatorFolderAsync()
+    {
+        try
+        {
+            SetStatus("Requesting root access and scanning Winlator C: drives...");
+            if (!RootShell.IsAvailable(out string detail))
+            {
+                SetStatus("Root unavailable. Grant NSC Mod Manager root permission in Magisk/KernelSU. " + detail);
+                return;
+            }
+
+            IReadOnlyList<string> drives = await Task.Run(RootShell.DetectWinlatorCDrives);
+            if (drives.Count == 0)
+            {
+                ShowManualRootPathDialog();
+                return;
+            }
+
+            string[] labels = drives.Select(x => x.Replace("/data/user/0/", "", StringComparison.Ordinal)
+                                                     .Replace("/data/data/", "", StringComparison.Ordinal)).ToArray();
+            new AlertDialog.Builder(this)
+                .SetTitle("Winlator C: drives (ROOT)")
+                .SetMessage("Pilih container, lalu navigasi ke folder game Storm Connections.")
+                .SetItems(labels, (_, e) => ShowRootFolderBrowser(drives[e.Which], drives[e.Which]))
+                .SetNeutralButton("Manual Path", (_, _) => ShowManualRootPathDialog())
+                .SetNegativeButton("Cancel", (_, _) => { })
+                .Show();
+        }
+        catch (Exception ex) { SetStatus("Root Winlator scan failed: " + ex.Message); }
+    }
+
+    void ShowManualRootPathDialog()
+    {
+        var input = StyledEditText(_prefs.RootGamePath ? _prefs.GamePath : "", "/data/user/0/.../.wine/drive_c/Games/...");
+        new AlertDialog.Builder(this)
+            .SetTitle("Manual ROOT game path")
+            .SetMessage("Masukkan path Linux asli folder game di private Winlator storage.")
+            .SetView(input)
+            .SetNegativeButton("Cancel", (_, _) => { })
+            .SetPositiveButton("Use", (_, _) =>
+            {
+                string path = input.Text?.Trim() ?? "";
+                var check = RootShell.ValidateGamePath(path);
+                if (!check.Ok) { SetStatus(check.Message); return; }
+                SetRootGamePath(path, check.Message);
+            })
+            .Show();
+    }
+
+    void ShowRootFolderBrowser(string current, string anchor)
+    {
+        try
+        {
+            IReadOnlyList<string> dirs = RootShell.ListDirectories(current);
+            string[] labels = dirs.Select(x => IOPath.GetFileName(x.TrimEnd('/'))).ToArray();
+            var builder = new AlertDialog.Builder(this)
+                .SetTitle("ROOT C:  " + RelativeRootLabel(anchor, current))
+                .SetMessage(labels.Length == 0 ? "Folder kosong / tidak ada subfolder. Pilih USE THIS FOLDER kalau ini folder game." : "Tap folder untuk masuk lebih dalam.")
+                .SetNegativeButton("Cancel", (_, _) => { })
+                .SetPositiveButton("USE THIS FOLDER", (_, _) =>
+                {
+                    var check = RootShell.ValidateGamePath(current);
+                    if (!check.Ok) { SetStatus(check.Message); return; }
+                    SetRootGamePath(current, check.Message);
+                });
+
+            if (labels.Length > 0)
+                builder.SetItems(labels, (_, e) => ShowRootFolderBrowser(dirs[e.Which], anchor));
+
+            if (!current.TrimEnd('/').Equals(anchor.TrimEnd('/'), StringComparison.Ordinal))
+            {
+                builder.SetNeutralButton("UP", (_, _) =>
+                {
+                    string parent = RootShell.UnixDirName(current);
+                    if (!parent.StartsWith(anchor.TrimEnd('/') + "/", StringComparison.Ordinal) && !parent.Equals(anchor.TrimEnd('/'), StringComparison.Ordinal))
+                        parent = anchor;
+                    ShowRootFolderBrowser(parent, anchor);
+                });
+            }
+            builder.Show();
+        }
+        catch (Exception ex) { SetStatus("Root folder browse failed: " + ex.Message); }
+    }
+
+    static string RelativeRootLabel(string anchor, string current)
+    {
+        string a = anchor.TrimEnd('/');
+        string c = current.TrimEnd('/');
+        if (c.Equals(a, StringComparison.Ordinal)) return "C:\\";
+        string rel = c.StartsWith(a + "/", StringComparison.Ordinal) ? c[(a.Length + 1)..] : c;
+        return "C:\\" + rel.Replace('/', '\\');
+    }
+
+    void SetRootGamePath(string path, string note)
+    {
+        _gamePath.Text = path.TrimEnd('/');
+        _prefs.GamePath = _gamePath.Text;
+        _prefs.GameTreeUri = "";
+        _prefs.GameDisplayPath = "";
+        _prefs.GameMode = GameAccessMode.RootPath;
+        _safFixInstalledCache = null;
+        RefreshRootFixCache();
+        SetStatus("ROOT / Winlator C: selected | " + note);
     }
 
     void PickMod()
@@ -404,19 +584,65 @@ public sealed class MainActivity : Activity
         try
         {
             ActivityFlags takeFlags = data.Flags & (ActivityFlags.GrantReadUriPermission | ActivityFlags.GrantWriteUriPermission);
-            try { ContentResolver?.TakePersistableUriPermission(uri, takeFlags); } catch { /* Direct-path access remains the compiler requirement. */ }
-
-            if (!AndroidFolderPathResolver.TryResolve(uri, out string path, out string error))
+            if ((takeFlags & ActivityFlags.GrantWriteUriPermission) == 0)
             {
-                SetStatus(error);
+                SetStatus("Selected DocumentsProvider did not grant write access. Choose the game folder again and allow read/write access.");
+                return;
+            }
+            string persistNote = "";
+            try
+            {
+                if (takeFlags != 0)
+                    RequireContentResolver().TakePersistableUriPermission(uri, takeFlags);
+            }
+            catch (Exception ex)
+            {
+                persistNote = " Persisted permission warning: " + ex.Message;
+            }
+
+            // ExternalStorageProvider folders that expose a real filesystem path
+            // keep using the fastest direct-path backend. Any other document tree
+            // (including Winlator's C: provider) is used directly through SAF.
+            if (AndroidFolderPathResolver.TryResolve(uri, out string directPath, out _)
+                && Directory.Exists(directPath))
+            {
+                _gamePath.Text = directPath;
+                _prefs.GamePath = directPath;
+                _prefs.GameTreeUri = "";
+                _prefs.GameDisplayPath = "";
+                _prefs.GameMode = GameAccessMode.DirectPath;
+                _rootFixInstalledCache = null;
+                _safFixInstalledCache = null;
+                var directCheck = PathValidator.ValidateGamePath(directPath);
+                SetStatus("Selected direct storage: " + directPath + " | " + directCheck.Message);
                 return;
             }
 
-            _gamePath.Text = path;
-            _prefs.GamePath = path;
-            var check = PathValidator.ValidateGamePath(path);
-            string accessNote = string.IsNullOrWhiteSpace(error) ? check.Message : error;
-            SetStatus("Selected: " + path + " | " + accessNote);
+            string treeUri = uri.ToString();
+            var check = SafGameBridge.ValidateGamePath(RequireContentResolver(), treeUri);
+            if (!check.Ok)
+            {
+                SetStatus(check.Message + persistNote);
+                return;
+            }
+            var writeCheck = SafGameBridge.ProbeWriteAccess(RequireContentResolver(), treeUri);
+            if (!writeCheck.Ok)
+            {
+                SetStatus(writeCheck.Message + persistNote);
+                return;
+            }
+
+            string folderName = SafGameBridge.GetDisplayName(RequireContentResolver(), treeUri);
+            string authority = uri.Authority ?? "DocumentsProvider";
+            string display = "Winlator SAF: " + folderName + "  [" + authority + "]";
+            _prefs.GamePath = "";
+            _prefs.GameTreeUri = treeUri;
+            _prefs.GameDisplayPath = display;
+            _prefs.GameMode = GameAccessMode.SafDocumentTree;
+            _gamePath.Text = display;
+            _rootFixInstalledCache = null;
+            RefreshSafFixCache();
+            SetStatus("Selected Winlator/SAF folder directly — no root required. " + check.Message + persistNote);
         }
         catch (Exception ex)
         {
@@ -491,12 +717,39 @@ public sealed class MainActivity : Activity
         try
         {
             SaveGamePath();
-            var check = PathValidator.ValidateGamePath(_prefs.GamePath);
+            var check = ValidateCurrentGamePath();
             if (!check.Ok) { SetStatus(check.Message); return; }
             if (!File.Exists(_payloadZip)) { SetStatus("Bundled ModdingAPI payload is missing from APK."); return; }
 
-            int count = ModdingApiInstaller.Install(_payloadZip, _prefs.GamePath);
-            SetStatus($"ModdingAPI installed/updated: {count} file(s).");
+            int count;
+            switch (_prefs.GameMode)
+            {
+                case GameAccessMode.RootPath:
+                {
+                    string work = IOPath.Combine(CacheDir?.AbsolutePath ?? FilesDir!.AbsolutePath, "root_api_install");
+                    count = RootGameBridge.InstallApi(_payloadZip, _prefs.GamePath, work);
+                    _rootFixInstalledCache = true;
+                    break;
+                }
+                case GameAccessMode.SafDocumentTree:
+                {
+                    string work = IOPath.Combine(CacheDir?.AbsolutePath ?? FilesDir!.AbsolutePath, "saf_api_install");
+                    count = SafGameBridge.InstallApi(RequireContentResolver(), _prefs.GameTreeUri, _payloadZip, work);
+                    _safFixInstalledCache = true;
+                    break;
+                }
+                default:
+                    count = ModdingApiInstaller.Install(_payloadZip, _prefs.GamePath);
+                    break;
+            }
+
+            string suffix = _prefs.GameMode switch
+            {
+                GameAccessMode.RootPath => " via ROOT.",
+                GameAccessMode.SafDocumentTree => " directly via Winlator SAF (no root).",
+                _ => "."
+            };
+            SetStatus($"ModdingAPI installed/updated: {count} file(s)" + suffix);
         }
         catch (Exception ex)
         {
@@ -519,10 +772,24 @@ public sealed class MainActivity : Activity
         try
         {
             SaveGamePath();
-            var check = PathValidator.ValidateGamePath(_prefs.GamePath);
+            var check = ValidateCurrentGamePath();
             if (!check.Ok) { SetStatus(check.Message); return; }
             SetStatus("Clearing generated mod files and restoring backups...");
-            GameCleanupResult result = await Task.Run(() => GameCleanup.ClearCompiledMods(_payloadZip, _prefs.GamePath));
+            GameCleanupResult result = await Task.Run(() =>
+            {
+                return _prefs.GameMode switch
+                {
+                    GameAccessMode.RootPath => RootGameBridge.ClearCompiledMods(
+                        _payloadZip, _prefs.GamePath,
+                        IOPath.Combine(CacheDir?.AbsolutePath ?? FilesDir!.AbsolutePath, "root_clear")),
+                    GameAccessMode.SafDocumentTree => SafGameBridge.ClearCompiledMods(
+                        RequireContentResolver(), _prefs.GameTreeUri, _payloadZip,
+                        IOPath.Combine(CacheDir?.AbsolutePath ?? FilesDir!.AbsolutePath, "saf_clear")),
+                    _ => GameCleanup.ClearCompiledMods(_payloadZip, _prefs.GamePath)
+                };
+            });
+            if (_prefs.GameMode == GameAccessMode.RootPath) _rootFixInstalledCache = true;
+            if (_prefs.GameMode == GameAccessMode.SafDocumentTree) _safFixInstalledCache = true;
             SetStatus(result.ClearSummary);
         }
         catch (Exception ex)
@@ -546,10 +813,20 @@ public sealed class MainActivity : Activity
         try
         {
             SaveGamePath();
-            var check = PathValidator.ValidateGamePath(_prefs.GamePath);
+            var check = ValidateCurrentGamePath();
             if (!check.Ok) { SetStatus(check.Message); return; }
             SetStatus("Removing ModdingAPI and restoring game backups...");
-            GameCleanupResult result = await Task.Run(() => GameCleanup.RemoveModdingApi(_payloadZip, _prefs.GamePath));
+            GameCleanupResult result = await Task.Run(() =>
+            {
+                return _prefs.GameMode switch
+                {
+                    GameAccessMode.RootPath => RootGameBridge.RemoveModdingApi(_payloadZip, _prefs.GamePath),
+                    GameAccessMode.SafDocumentTree => SafGameBridge.RemoveModdingApi(RequireContentResolver(), _prefs.GameTreeUri, _payloadZip),
+                    _ => GameCleanup.RemoveModdingApi(_payloadZip, _prefs.GamePath)
+                };
+            });
+            if (_prefs.GameMode == GameAccessMode.RootPath) _rootFixInstalledCache = false;
+            if (_prefs.GameMode == GameAccessMode.SafDocumentTree) _safFixInstalledCache = false;
             SetStatus(result.RemoveApiSummary);
         }
         catch (Exception ex)
@@ -564,20 +841,41 @@ public sealed class MainActivity : Activity
         try
         {
             SaveGamePath();
-            var check = PathValidator.ValidateGamePath(_prefs.GamePath);
+            var check = ValidateCurrentGamePath();
             if (!check.Ok) { SetStatus(check.Message); return; }
             if (!File.Exists(_payloadZip)) { SetStatus("Bundled ModdingAPI payload is missing from APK."); return; }
             if (!File.Exists(_baseParamZip)) { SetStatus("Bundled NSC parameter baseline is missing from APK."); return; }
             if (!File.Exists(_messageBaseZip)) { SetStatus("Bundled NSC localization baseline is missing from APK."); return; }
 
             _compileButton.Enabled = false;
-            SetStatus("Starting compile...");
+            SetStatus(_prefs.GameMode == GameAccessMode.SafDocumentTree
+                ? "Starting compile in local cache; output will stream directly to Winlator C: through SAF..."
+                : "Starting compile...");
             string work = IOPath.Combine(CacheDir?.AbsolutePath ?? FilesDir!.AbsolutePath, "compile_work");
             IProgress<string> progress = new Progress<string>(message => SetStatus(message));
 
             CompileResult result = await Task.Run(() =>
-                _compiler.Compile(_prefs.GamePath, _prefs.ModsPath, _payloadZip, _baseParamZip, _messageBaseZip, work, message => progress.Report(message)));
+            {
+                return _prefs.GameMode switch
+                {
+                    GameAccessMode.RootPath => RootGameBridge.Compile(
+                        _compiler, _prefs.GamePath, _prefs.ModsPath, _payloadZip, _baseParamZip, _messageBaseZip,
+                        IOPath.Combine(CacheDir?.AbsolutePath ?? FilesDir!.AbsolutePath, "root_compile_session"),
+                        Android.OS.Process.MyUid(), message => progress.Report(message)),
+                    GameAccessMode.SafDocumentTree => SafGameBridge.Compile(
+                        _compiler, RequireContentResolver(), _prefs.GameTreeUri,
+                        string.IsNullOrWhiteSpace(_prefs.GameDisplayPath) ? "Winlator SAF game folder" : _prefs.GameDisplayPath,
+                        _prefs.ModsPath, _payloadZip, _baseParamZip, _messageBaseZip,
+                        IOPath.Combine(CacheDir?.AbsolutePath ?? FilesDir!.AbsolutePath, "saf_compile_session"),
+                        message => progress.Report(message)),
+                    _ => _compiler.Compile(
+                        _prefs.GamePath, _prefs.ModsPath, _payloadZip, _baseParamZip, _messageBaseZip,
+                        work, message => progress.Report(message))
+                };
+            });
 
+            if (_prefs.GameMode == GameAccessMode.RootPath) _rootFixInstalledCache = true;
+            if (_prefs.GameMode == GameAccessMode.SafDocumentTree) _safFixInstalledCache = true;
             string suffix = result.Warnings.Count == 0
                 ? ""
                 : $" | {result.Warnings.Count} warning(s); see compile report";
@@ -602,15 +900,29 @@ public sealed class MainActivity : Activity
     {
         try
         {
+            if (_prefs.GameMode == GameAccessMode.SafDocumentTree)
+            {
+                return SafGameBridge.WriteCompileError(
+                    RequireContentResolver(), _prefs.GameTreeUri,
+                    string.IsNullOrWhiteSpace(_prefs.GameDisplayPath) ? "Winlator SAF game folder" : _prefs.GameDisplayPath,
+                    ex);
+            }
+
             string game = _prefs.GamePath;
-            if (string.IsNullOrWhiteSpace(game) || !Directory.Exists(game)) return null;
+            if (string.IsNullOrWhiteSpace(game)) return null;
+            if (_prefs.GameMode == GameAccessMode.RootPath)
+            {
+                string temp = IOPath.Combine(CacheDir?.AbsolutePath ?? FilesDir!.AbsolutePath, "root_last_error.txt");
+                return RootGameBridge.WriteCompileError(game, ex, temp);
+            }
+            if (!Directory.Exists(game)) return null;
             string dir = IOPath.Combine(game, "moddingapi", "mods", "base_game");
             Directory.CreateDirectory(dir);
             string path = IOPath.Combine(dir, "nsc_android_last_error.txt");
             File.WriteAllText(path,
-                "NSC Mod Manager Android — v0.5.1 last compile error" + System.Environment.NewLine +
+                "NSC Mod Manager Android — v0.5.3 last compile error" + System.Environment.NewLine +
                 "Time: " + DateTime.Now.ToString("O") + System.Environment.NewLine +
-                "App: 0.5.1" + System.Environment.NewLine +
+                "App: 0.5.3" + System.Environment.NewLine +
                 "Game: " + game + System.Environment.NewLine + System.Environment.NewLine +
                 ex.ToString());
             return path;
@@ -621,14 +933,19 @@ public sealed class MainActivity : Activity
         }
     }
 
-
-
     void ArmApiProbe()
     {
         try
         {
             SaveGamePath();
-            var check = PathValidator.ValidateGamePath(_prefs.GamePath);
+            if (_prefs.GameMode != GameAccessMode.DirectPath)
+            {
+                SetStatus(_prefs.GameMode == GameAccessMode.SafDocumentTree
+                    ? "Advanced API diagnostics are not SAF-backed yet. Compile / Install / Clear / Remove already work directly with Winlator C: through SAF."
+                    : "Advanced API diagnostics are not root-backed yet. Compile / Install / Clear / Remove already support Winlator C: root mode.");
+                return;
+            }
+            var check = ValidateCurrentGamePath();
             if (!check.Ok) { SetStatus(check.Message); return; }
             string probe = IOPath.Combine(_prefs.GamePath, "moddingapi", "mods", "base_game", "NSCApiRuntimeProbe.dll");
             if (!File.Exists(probe))
@@ -644,7 +961,14 @@ public sealed class MainActivity : Activity
         try
         {
             SaveGamePath();
-            var check = PathValidator.ValidateGamePath(_prefs.GamePath);
+            if (_prefs.GameMode != GameAccessMode.DirectPath)
+            {
+                SetStatus(_prefs.GameMode == GameAccessMode.SafDocumentTree
+                    ? "Advanced API diagnostics are not SAF-backed yet. Compile / Install / Clear / Remove already work directly with Winlator C: through SAF."
+                    : "Advanced API diagnostics are not root-backed yet. Compile / Install / Clear / Remove already support Winlator C: root mode.");
+                return;
+            }
+            var check = ValidateCurrentGamePath();
             if (!check.Ok) { SetStatus(check.Message); return; }
             ApiProbeStatus status = UltimateStormApiDiagnostics.GetProbeStatus(_prefs.GamePath);
             SetStatus("API runtime " + status.State + ": " + status.Message);
@@ -657,7 +981,14 @@ public sealed class MainActivity : Activity
         try
         {
             SaveGamePath();
-            var check = PathValidator.ValidateGamePath(_prefs.GamePath);
+            if (_prefs.GameMode != GameAccessMode.DirectPath)
+            {
+                SetStatus(_prefs.GameMode == GameAccessMode.SafDocumentTree
+                    ? "Advanced API diagnostics are not SAF-backed yet. Compile / Install / Clear / Remove already work directly with Winlator C: through SAF."
+                    : "Advanced API diagnostics are not root-backed yet. Compile / Install / Clear / Remove already support Winlator C: root mode.");
+                return;
+            }
+            var check = ValidateCurrentGamePath();
             if (!check.Ok) { SetStatus(check.Message); return; }
             bool enabled = UltimateStormApiDiagnostics.ToggleDebug(_prefs.GamePath);
             SetStatus(enabled
@@ -675,7 +1006,14 @@ public sealed class MainActivity : Activity
         try
         {
             SaveGamePath();
-            var check = PathValidator.ValidateGamePath(_prefs.GamePath);
+            if (_prefs.GameMode != GameAccessMode.DirectPath)
+            {
+                SetStatus(_prefs.GameMode == GameAccessMode.SafDocumentTree
+                    ? "Advanced API diagnostics are not SAF-backed yet. Compile / Install / Clear / Remove already work directly with Winlator C: through SAF."
+                    : "Advanced API diagnostics are not root-backed yet. Compile / Install / Clear / Remove already support Winlator C: root mode.");
+                return;
+            }
+            var check = ValidateCurrentGamePath();
             if (!check.Ok) { SetStatus(check.Message); return; }
             string root;
             if (string.IsNullOrWhiteSpace(_prefs.ModsPath))

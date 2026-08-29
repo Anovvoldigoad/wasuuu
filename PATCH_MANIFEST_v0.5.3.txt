@@ -1,0 +1,27 @@
+NSC Mod Manager Android v0.5.3 — Winlator SAF Direct
+Base: v0.5.2 Root Winlator C / BuildFix1 / CompatV2
+
+Changed/new source files:
+- MainActivity.cs
+- NSC-ModManager.Android.csproj
+- Core/AndroidPrefs.cs
+- Core/RootGameBridge.cs
+- Core/SafDocumentTree.cs (new)
+- Core/SafGameBridge.cs (new)
+- scripts/validate_phase2c.py
+- .github/workflows/build-android.yml
+- README.md
+- WINLATOR_SAF_DIRECT_MODE.md (new)
+- PHASE2E_WINLATOR_SAF_DIRECT.md (new)
+
+Behavior:
+- ACTION_OPEN_DOCUMENT_TREE still uses direct filesystem mode when ExternalStorageProvider resolves to an accessible real path.
+- Any other readable/writable DocumentsProvider tree (including Winlator C: exports) is stored as a persisted SAF target.
+- No root is required for SAF mode.
+- Compile, Install/Update API, Clear Compiled, Remove API, compile-error output and condition-fix verification use SAF directly.
+- Root mode remains available and unchanged except app version text.
+- Advanced API probe/debug/export remains direct-path-only for now and reports this explicitly in SAF/root mode.
+
+Runtime compatibility payload is unchanged:
+- NSCApiConditionCompatFix_v2.dll remains the bundled runtime fix.
+- No character/mod IDs are hardcoded.

@@ -73,8 +73,8 @@ for lang in ('arae','chi','eng','esmx','fre','ger','idid','ita','kokr','pol','po
     if f'"{lang}"' not in message_source:
         errors.append('MessageInfoMerger missing NSC language: ' + lang)
 
-# 2f) Phase 2C.3 UX/maintenance and runtime diagnostics features must remain wired to direct-path
-# Android folder selection and non-destructive cleanup.
+# 2f) UX/maintenance and runtime diagnostics features must keep direct-path support while
+# v0.5.3 also wires a no-root SAF document-tree backend for Winlator C: providers.
 main_activity = (ROOT / 'MainActivity.cs').read_text(encoding='utf-8-sig', errors='ignore')
 cleanup_source = (ROOT / 'Core' / 'GameCleanup.cs').read_text(encoding='utf-8-sig', errors='ignore')
 folder_source = (ROOT / 'Core' / 'AndroidFolderPathResolver.cs').read_text(encoding='utf-8-sig', errors='ignore')
@@ -85,7 +85,27 @@ for token in ('RegisterManagedFile', 'ClearCompiledMods', 'RemoveModdingApi', '.
     if token not in cleanup_source:
         errors.append('Phase 2C.2 cleanup safety feature missing: ' + token)
 if 'com.android.externalstorage.documents' not in folder_source:
-    errors.append('Phase 2C.2 folder resolver must require ExternalStorageProvider direct paths')
+    errors.append('Direct-path folder resolver must retain ExternalStorageProvider support')
+
+saf_tree_path = ROOT / 'Core' / 'SafDocumentTree.cs'
+saf_bridge_path = ROOT / 'Core' / 'SafGameBridge.cs'
+if not saf_tree_path.is_file():
+    errors.append('v0.5.3 SAF document-tree adapter missing')
+else:
+    saf_tree = saf_tree_path.read_text(encoding='utf-8-sig', errors='ignore')
+    for token in ('BuildDocumentUriUsingTree', 'BuildChildDocumentsUriUsingTree', 'CreateDocument', 'DeleteDocument', 'OpenOutputStream', 'rwt', 'wt'):
+        if token not in saf_tree:
+            errors.append('v0.5.3 SAF document-tree adapter missing: ' + token)
+if not saf_bridge_path.is_file():
+    errors.append('v0.5.3 SAF game bridge missing')
+else:
+    saf_bridge = saf_bridge_path.read_text(encoding='utf-8-sig', errors='ignore')
+    for token in ('Compile(', 'InstallApi(', 'ClearCompiledMods(', 'RemoveModdingApi(', 'ProbeWriteAccess', 'IsConditionFixPresent', '.nscmm_android.bak'):
+        if token not in saf_bridge:
+            errors.append('v0.5.3 SAF game bridge missing: ' + token)
+for token in ('TakePersistableUriPermission', 'GameAccessMode.SafDocumentTree', 'SafGameBridge.Compile', 'SafGameBridge.InstallApi', 'SafGameBridge.ClearCompiledMods', 'SafGameBridge.RemoveModdingApi'):
+    if token not in main_activity:
+        errors.append('v0.5.3 Winlator SAF UI/runtime wiring missing: ' + token)
 
 diag_source = (ROOT / 'Core' / 'UltimateStormApiDiagnostics.cs').read_text(encoding='utf-8-sig', errors='ignore')
 verify_source = (ROOT / 'Core' / 'SpecialApiVerifier.cs').read_text(encoding='utf-8-sig', errors='ignore')
@@ -210,10 +230,10 @@ if message_zip.is_file():
         errors.append('invalid nsc_message_base.zip: ' + str(e))
 
 if errors:
-    print('Phase 2D static validation FAILED:')
+    print('Phase 2E / v0.5.3 static validation FAILED:')
     for e in errors: print(' -', e)
     sys.exit(1)
-print('Phase 2D static validation OK')
+print('Phase 2E / v0.5.3 static validation OK')
 print(f'  C# files: {sum(1 for _ in ROOT.rglob("*.cs"))}')
 print(f'  parameter baseline: {param_zip.stat().st_size:,} bytes')
 print(f'  ModdingAPI payload: {api_zip.stat().st_size:,} bytes')
