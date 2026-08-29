@@ -6,8 +6,8 @@
     <AssemblyName>NSCModManagerAndroid</AssemblyName>
     <ApplicationId>com.nscmodmanager.android</ApplicationId>
     <ApplicationTitle>NSC Mod Manager Android</ApplicationTitle>
-    <ApplicationVersion>13</ApplicationVersion>
-    <ApplicationDisplayVersion>0.4.1</ApplicationDisplayVersion>
+    <ApplicationVersion>14</ApplicationVersion>
+    <ApplicationDisplayVersion>0.4.2</ApplicationDisplayVersion>
     <SupportedOSPlatformVersion>26.0</SupportedOSPlatformVersion>
     <AndroidUseSharedRuntime>false</AndroidUseSharedRuntime>
     <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>

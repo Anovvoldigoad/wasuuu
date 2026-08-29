@@ -1,4 +1,4 @@
-# NSC Mod Manager Android — Phase 2C.1
+# NSC Mod Manager Android — Phase 2C.2
 
 Native Android ARM64 port of the NSC ModManager workflow. No Winlator/Wine is required.
 
@@ -18,3 +18,11 @@ Build target: .NET 10 Android, `android-arm64`.
 - Select Game Folder with Android folder picker and direct filesystem path resolution.
 - Clear Compiled Mods restores backups and keeps ModdingAPI installed.
 - Remove ModdingAPI removes bundled payload/compiler output without recursively deleting unrelated user files.
+
+
+## Phase 2C.2 advanced-runtime diagnostics
+- Verifies generated UltimateStormAPI condition/special/ougi mappings after semantic compile.
+- Adds optional UltimateStormAPI debug toggle and log export.
+- Keeps these diagnostics generic and independent from any individual mod/character fixture.
+
+See `PHASE2C_2_SPECIAL_API_DIAGNOSTICS.md`.

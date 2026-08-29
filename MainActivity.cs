@@ -72,7 +72,7 @@ public sealed class MainActivity : Activity
         scroll.AddView(root);
 
         root.AddView(new TextView(this) { Text = "NSC Mod Manager — Android ARM64", TextSize = 22 });
-        root.AddView(new TextView(this) { Text = "Phase 2C.1: generic compiler + game folder picker + safe game cleanup/ModdingAPI removal. Native ARM64 CPK; no Winlator/Wine required." });
+        root.AddView(new TextView(this) { Text = "Phase 2C.2: generic compiler + special API verification/debug diagnostics + folder picker/cleanup. Native ARM64 CPK; no Winlator/Wine required." });
 
         root.AddView(new TextView(this) { Text = "Game directory" });
         _gamePath = new EditText(this) { Text = _prefs.GamePath, Hint = "/storage/.../Storm Connections" };
@@ -115,6 +115,11 @@ public sealed class MainActivity : Activity
         maintenance.AddView(MakeButton("Clear Compiled Mods", (_, _) => ConfirmClearCompiledMods()));
         maintenance.AddView(MakeButton("Remove ModdingAPI", (_, _) => ConfirmRemoveModdingApi()));
         root.AddView(maintenance);
+
+        var apiDiagnostics = Row();
+        apiDiagnostics.AddView(MakeButton("Toggle API Debug", (_, _) => ToggleApiDebug()));
+        apiDiagnostics.AddView(MakeButton("Export API Log", (_, _) => ExportApiLog()));
+        root.AddView(apiDiagnostics);
 
         var cpk = Row();
         cpk.AddView(MakeButton("CPK Pack + Extract Self-Test", (_, _) => CpkSelfTest()));
@@ -434,9 +439,9 @@ public sealed class MainActivity : Activity
             Directory.CreateDirectory(dir);
             string path = Path.Combine(dir, "nsc_android_last_error.txt");
             File.WriteAllText(path,
-                "NSC Mod Manager Android — Phase 2C.1 last compile error" + System.Environment.NewLine +
+                "NSC Mod Manager Android — Phase 2C.2 last compile error" + System.Environment.NewLine +
                 "Time: " + DateTime.Now.ToString("O") + System.Environment.NewLine +
-                "App: 0.4.1" + System.Environment.NewLine +
+                "App: 0.4.2" + System.Environment.NewLine +
                 "Game: " + game + System.Environment.NewLine + System.Environment.NewLine +
                 ex.ToString());
             return path;
@@ -444,6 +449,50 @@ public sealed class MainActivity : Activity
         catch
         {
             return null;
+        }
+    }
+
+
+    void ToggleApiDebug()
+    {
+        try
+        {
+            SaveGamePath();
+            var check = PathValidator.ValidateGamePath(_prefs.GamePath);
+            if (!check.Ok) { SetStatus(check.Message); return; }
+            bool enabled = UltimateStormApiDiagnostics.ToggleDebug(_prefs.GamePath);
+            SetStatus(enabled
+                ? "UltimateStormAPI debug enabled. Launch the game, reproduce the broken advanced jutsu, exit the game, then tap Export API Log."
+                : "UltimateStormAPI debug disabled.");
+        }
+        catch (Exception ex)
+        {
+            SetStatus("API debug toggle failed: " + ex.Message);
+        }
+    }
+
+    void ExportApiLog()
+    {
+        try
+        {
+            SaveGamePath();
+            var check = PathValidator.ValidateGamePath(_prefs.GamePath);
+            if (!check.Ok) { SetStatus(check.Message); return; }
+            string root = string.IsNullOrWhiteSpace(_prefs.ModsPath)
+                ? Path.Combine(Android.OS.Environment.ExternalStorageDirectory?.AbsolutePath ?? "/storage/emulated/0", "NSC-ModManager")
+                : _prefs.ModsPath;
+            string export = Path.Combine(root, "logs");
+            IReadOnlyList<string> files = UltimateStormApiDiagnostics.ExportLogs(_prefs.GamePath, export);
+            if (files.Count == 0)
+            {
+                SetStatus("No UltimateStormAPI log found yet. Toggle API Debug ON, launch the game, reproduce the issue, then exit the game and export again.");
+                return;
+            }
+            SetStatus($"Exported {files.Count} API log file(s) to {export}");
+        }
+        catch (Exception ex)
+        {
+            SetStatus("API log export failed: " + ex.Message);
         }
     }
 

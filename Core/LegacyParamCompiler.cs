@@ -141,6 +141,7 @@ internal sealed class LegacyParamCompiler
         List<StageModModel> StagesToAdd = new();
         List<string> CharselIconNamesList = new();
         List<string> CharselLoadedIconsList = new();
+        var apiExpectations = new SpecialApiVerifier.Expectations();
         for (int i = 0; i < playerIcon_vanilla.playerIconList.Count; i++)
             if (!CharselLoadedIconsList.Contains(playerIcon_vanilla.playerIconList[i].BaseIcon))
                 CharselLoadedIconsList.Add(playerIcon_vanilla.playerIconList[i].BaseIcon);
@@ -321,6 +322,8 @@ internal sealed class LegacyParamCompiler
                         // Loop through all entries in the mod's ConditionManagerList
                         foreach (ConditionManagerModel conditionManager in conditionprmManager_mod.ConditionList)
                         {
+                            if (!string.IsNullOrWhiteSpace(conditionManager.ConditionName))
+                                apiExpectations.ConditionManagerNames.Add(conditionManager.ConditionName);
                             // Check if the condition manager already exists in the vanilla list
                             var existingConditionManager = conditionprmManager_vanilla.ConditionList
                                 .FirstOrDefault(c => c.ConditionName == conditionManager.ConditionName);
@@ -1479,15 +1482,26 @@ internal sealed class LegacyParamCompiler
                     }
 
                     //specialCondParam file
-                    byte[] specialCondParam_mod = new byte[0];
+                    byte[] specialCondParam_mod = Array.Empty<byte>();
                     if (File.Exists(specialCondParamModPath))
                     {
                         specialCondParam_mod = File.ReadAllBytes(specialCondParamModPath);
-                        if (specialCondParam_mod.Length % 32 != 0) result.Warnings.Add($"character {mod_characode}: specialCondParam size {specialCondParam_mod.Length} is not a multiple of 32 bytes");
+                        if (specialCondParam_mod.Length % 32 != 0)
+                            result.Warnings.Add($"character {mod_characode}: specialCondParam size {specialCondParam_mod.Length} is not a multiple of 32 bytes");
                         result.SpecialApiFilesMerged++;
                         result.FeatureDetails.Add($"character {mod_characode}: specialCondParam ({specialCondParam_mod.Length} bytes)");
-                        specialCondParam_mod = BinaryReader.b_ReplaceBytes(specialCondParam_mod, new byte[4] { 0, 0, 0, 0 }, 0x17);
-                        specialCondParam_mod = BinaryReader.b_ReplaceBytes(specialCondParam_mod, BitConverter.GetBytes(mod_characodeID), 0x18);
+
+                        // Each entry is 0x20 bytes. Desktop 2.1.1.0 patched only the
+                        // first entry; Android patches every complete record so community
+                        // mods containing more than one special condition remain valid.
+                        for (int p = 0; p + 0x20 <= specialCondParam_mod.Length; p += 0x20)
+                        {
+                            string conditionName = BinaryReader.b_ReadString(specialCondParam_mod, p);
+                            specialCondParam_mod = BinaryReader.b_ReplaceBytes(specialCondParam_mod, new byte[4], p + 0x17);
+                            specialCondParam_mod = BinaryReader.b_ReplaceBytes(specialCondParam_mod, BitConverter.GetBytes(mod_characodeID), p + 0x18);
+                            if (!string.IsNullOrWhiteSpace(conditionName))
+                                apiExpectations.SpecialConditions.Add((conditionName, mod_characodeID));
+                        }
                         specialCondParam_vanilla = BinaryReader.b_AddBytes(specialCondParam_vanilla, specialCondParam_mod);
                     }
 
@@ -1498,8 +1512,11 @@ internal sealed class LegacyParamCompiler
                         partnerSlotParam_mod = File.ReadAllBytes(partnerSlotParamModPath);
                         result.SpecialApiFilesMerged++;
                         result.FeatureDetails.Add($"character {mod_characode}: partnerSlotParam ({partnerSlotParam_mod.Length} bytes)");
-                        partnerSlotParam_mod = BinaryReader.b_ReplaceBytes(partnerSlotParam_mod, new byte[4] { 0, 0, 0, 0 }, 0x17);
-                        partnerSlotParam_mod = BinaryReader.b_ReplaceBytes(partnerSlotParam_mod, BitConverter.GetBytes(mod_characodeID), 0x18);
+                        for (int p = 0; p + 0x20 <= partnerSlotParam_mod.Length; p += 0x20)
+                        {
+                            partnerSlotParam_mod = BinaryReader.b_ReplaceBytes(partnerSlotParam_mod, new byte[4], p + 0x17);
+                            partnerSlotParam_mod = BinaryReader.b_ReplaceBytes(partnerSlotParam_mod, BitConverter.GetBytes(mod_characodeID), p + 0x18);
+                        }
                         partnerSlotParam_vanilla = BinaryReader.b_AddBytes(partnerSlotParam_vanilla, partnerSlotParam_mod);
                     }
 
@@ -1510,8 +1527,11 @@ internal sealed class LegacyParamCompiler
                         susanooCondParam_mod = File.ReadAllBytes(susanooCondParamModPath);
                         result.SpecialApiFilesMerged++;
                         result.FeatureDetails.Add($"character {mod_characode}: susanooCondParam ({susanooCondParam_mod.Length} bytes)");
-                        susanooCondParam_mod = BinaryReader.b_ReplaceBytes(susanooCondParam_mod, new byte[4] { 0, 0, 0, 0 }, 0x17);
-                        susanooCondParam_mod = BinaryReader.b_ReplaceBytes(susanooCondParam_mod, BitConverter.GetBytes(mod_characodeID), 0x18);
+                        for (int p = 0; p + 0x20 <= susanooCondParam_mod.Length; p += 0x20)
+                        {
+                            susanooCondParam_mod = BinaryReader.b_ReplaceBytes(susanooCondParam_mod, new byte[4], p + 0x17);
+                            susanooCondParam_mod = BinaryReader.b_ReplaceBytes(susanooCondParam_mod, BitConverter.GetBytes(mod_characodeID), p + 0x18);
+                        }
                         susanooCondParam_vanilla = BinaryReader.b_AddBytes(susanooCondParam_vanilla, susanooCondParam_mod);
                     }
 
@@ -1539,6 +1559,7 @@ internal sealed class LegacyParamCompiler
                         result.SpecialApiFilesMerged++;
                         result.FeatureDetails.Add($"character {mod_characode}: ougiAwakeningParam ({ougiAwakeningParam_mod.Length} bytes)");
                         ougiAwakeningParam_mod = BinaryReader.b_ReplaceBytes(ougiAwakeningParam_mod, BitConverter.GetBytes(mod_characodeID), 0, 0, 4);
+                        apiExpectations.OugiAwakeningIds.Add(mod_characodeID);
                         ougiAwakeningParam_vanilla = BinaryReader.b_AddBytes(ougiAwakeningParam_vanilla, ougiAwakeningParam_mod);
                     }
 
@@ -1813,6 +1834,8 @@ internal sealed class LegacyParamCompiler
         File.WriteAllBytes(Path.Combine(generatedApiParam, "susanooCondParam.xfbin"), susanooCondParam_vanilla);
         File.WriteAllBytes(Path.Combine(generatedApiParam, "gudoBallParam.xfbin"), gudoBallParam_vanilla);
         File.WriteAllBytes(Path.Combine(generatedApiParam, "ougiAwakeningParam.xfbin"), ougiAwakeningParam_vanilla);
+
+        SpecialApiVerifier.Verify(generatedApiParam, apiExpectations, result);
 
         result.ParameterXfbinsMerged = saved;
         return new Output(

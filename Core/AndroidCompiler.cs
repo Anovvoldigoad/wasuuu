@@ -302,6 +302,7 @@ public sealed class AndroidCompiler
         sb.AppendLine($"Message XFBIN outputs generated: {result.MessageOutputsGenerated}");
         sb.AppendLine($"Special ModdingAPI feature files detected: {result.SpecialApiFilesDetected}");
         sb.AppendLine($"Special ModdingAPI feature files merged: {result.SpecialApiFilesMerged}");
+        sb.AppendLine($"Special ModdingAPI post-compile checks: {result.SpecialApiChecksPassed}/{result.SpecialApiChecksExpected}");
         sb.AppendLine($"Character PRM files detected: {result.PrmFilesDetected}");
         sb.AppendLine($"Character PRM files damage-effect remapped: {result.PrmFilesRemapped}");
         if (result.ParameterInputs.Count > 0)

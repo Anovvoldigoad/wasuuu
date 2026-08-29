@@ -28,6 +28,8 @@ public sealed class CompileResult
     public int MessageOutputsGenerated { get; internal set; }
     public int SpecialApiFilesDetected { get; internal set; }
     public int SpecialApiFilesMerged { get; internal set; }
+    public int SpecialApiChecksExpected { get; internal set; }
+    public int SpecialApiChecksPassed { get; internal set; }
     public int PrmFilesDetected { get; internal set; }
     public int PrmFilesRemapped { get; internal set; }
     public string? ReportPath { get; internal set; }

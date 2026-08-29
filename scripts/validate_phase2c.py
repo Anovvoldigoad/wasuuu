@@ -73,19 +73,28 @@ for lang in ('arae','chi','eng','esmx','fre','ger','idid','ita','kokr','pol','po
     if f'"{lang}"' not in message_source:
         errors.append('MessageInfoMerger missing NSC language: ' + lang)
 
-# 2f) Phase 2C.1 UX/maintenance features must remain wired to direct-path
+# 2f) Phase 2C.2 UX/maintenance and runtime diagnostics features must remain wired to direct-path
 # Android folder selection and non-destructive cleanup.
 main_activity = (ROOT / 'MainActivity.cs').read_text(encoding='utf-8-sig', errors='ignore')
 cleanup_source = (ROOT / 'Core' / 'GameCleanup.cs').read_text(encoding='utf-8-sig', errors='ignore')
 folder_source = (ROOT / 'Core' / 'AndroidFolderPathResolver.cs').read_text(encoding='utf-8-sig', errors='ignore')
-for token in ('Intent.ActionOpenDocumentTree', 'PickGameFolderRequest', 'Clear Compiled Mods', 'Remove ModdingAPI'):
+for token in ('Intent.ActionOpenDocumentTree', 'PickGameFolderRequest', 'Clear Compiled Mods', 'Remove ModdingAPI', 'Toggle API Debug', 'Export API Log'):
     if token not in main_activity:
-        errors.append('Phase 2C.1 UI feature missing: ' + token)
+        errors.append('Phase 2C.2 UI feature missing: ' + token)
 for token in ('RegisterManagedFile', 'ClearCompiledMods', 'RemoveModdingApi', '.nscmm_android.bak'):
     if token not in cleanup_source:
-        errors.append('Phase 2C.1 cleanup safety feature missing: ' + token)
+        errors.append('Phase 2C.2 cleanup safety feature missing: ' + token)
 if 'com.android.externalstorage.documents' not in folder_source:
-    errors.append('Phase 2C.1 folder resolver must require ExternalStorageProvider direct paths')
+    errors.append('Phase 2C.2 folder resolver must require ExternalStorageProvider direct paths')
+
+diag_source = (ROOT / 'Core' / 'UltimateStormApiDiagnostics.cs').read_text(encoding='utf-8-sig', errors='ignore')
+verify_source = (ROOT / 'Core' / 'SpecialApiVerifier.cs').read_text(encoding='utf-8-sig', errors='ignore')
+for token in ('enable_debug', 'enable_console', 'console.log'):
+    if token not in diag_source:
+        errors.append('Phase 2C.2 API diagnostics missing: ' + token)
+for token in ('conditionprmManager.xfbin', 'specialCondParam.xfbin', 'ougiAwakeningParam.xfbin'):
+    if token not in verify_source:
+        errors.append('Phase 2C.2 special API verifier missing: ' + token)
 
 # 3) Validate bundled compiler baselines. A missing entry would only fail at
 # runtime on the phone, so fail the CI earlier here.
@@ -118,6 +127,7 @@ required_messages = {
 }
 
 required_api = {
+    'd3dcompiler_47.dll','d3dcompiler_47_o.dll','moddingapi/config.ini',
     'moddingapi/param/NSC/guardEffectParam.xfbin','moddingapi/param/NSC/specialCondParam.xfbin',
     'moddingapi/param/NSC/gudoBallParam.xfbin','moddingapi/param/NSC/conditionprmManager.xfbin',
     'moddingapi/param/NSC/partnerSlotParam.xfbin','moddingapi/param/NSC/susanooCondParam.xfbin',
@@ -153,6 +163,11 @@ if api_zip.is_file():
             if bad: errors.append('corrupt moddingapi_payload.zip entry: ' + bad)
             names = set(z.namelist())
             for name in sorted(required_api - names): errors.append('ModdingAPI payload missing: ' + name)
+            if 'd3dcompiler_47.dll' in names:
+                api_dll = z.read('d3dcompiler_47.dll')
+                for marker in (b'GamepadDpadRight', b'GamepadDpadLeft', b'StageMove', b'OugiAwakeningParam'):
+                    if marker not in api_dll:
+                        errors.append('Bundled UltimateStormAPI runtime missing marker: ' + marker.decode('ascii'))
     except zipfile.BadZipFile as e:
         errors.append('invalid moddingapi_payload.zip: ' + str(e))
 
@@ -174,10 +189,10 @@ if message_zip.is_file():
         errors.append('invalid nsc_message_base.zip: ' + str(e))
 
 if errors:
-    print('Phase 2C.1 static validation FAILED:')
+    print('Phase 2C.2 static validation FAILED:')
     for e in errors: print(' -', e)
     sys.exit(1)
-print('Phase 2C.1 static validation OK')
+print('Phase 2C.2 static validation OK')
 print(f'  C# files: {sum(1 for _ in ROOT.rglob("*.cs"))}')
 print(f'  parameter baseline: {param_zip.stat().st_size:,} bytes')
 print(f'  ModdingAPI payload: {api_zip.stat().st_size:,} bytes')
