@@ -75,6 +75,18 @@ for lang in ('arae','chi','eng','esmx','fre','ger','idid','ita','kokr','pol','po
 
 # 2f) UX/maintenance and runtime diagnostics features must keep direct-path support while
 # v0.5.3 also wires a no-root SAF document-tree backend for Winlator C: providers.
+# Root mode is optional at runtime, but if its bridge is present its helper must
+# also be present so a partial overlay cannot pass validation and then fail C# build.
+root_bridge_path = ROOT / 'Core' / 'RootGameBridge.cs'
+root_shell_path = ROOT / 'Core' / 'RootShell.cs'
+if root_bridge_path.is_file() and not root_shell_path.is_file():
+    errors.append('RootGameBridge.cs present but required RootShell.cs is missing')
+if root_shell_path.is_file():
+    root_shell_source = root_shell_path.read_text(encoding='utf-8-sig', errors='ignore')
+    for token in ('class RootShell', 'IsAvailable(', 'DetectWinlatorCDrives(', 'Run('):
+        if token not in root_shell_source:
+            errors.append('RootShell helper incomplete: ' + token)
+
 main_activity = (ROOT / 'MainActivity.cs').read_text(encoding='utf-8-sig', errors='ignore')
 cleanup_source = (ROOT / 'Core' / 'GameCleanup.cs').read_text(encoding='utf-8-sig', errors='ignore')
 folder_source = (ROOT / 'Core' / 'AndroidFolderPathResolver.cs').read_text(encoding='utf-8-sig', errors='ignore')
