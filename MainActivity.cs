@@ -7,6 +7,7 @@ using Android.Provider;
 using Android.Views;
 using Android.Widget;
 using Android.Graphics;
+using IOPath = System.IO.Path;
 using Android.Graphics.Drawables;
 using NSC_ModManager_Android.Core;
 
@@ -45,19 +46,19 @@ public sealed class MainActivity : Activity
     {
         string baseDir = FilesDir?.AbsolutePath ?? throw new InvalidOperationException("Android FilesDir is unavailable.");
         CopyBundledAsset("Resources/TemplateImages/stage_icon.dds",
-            Path.Combine(baseDir, "Resources", "TemplateImages", "stage_icon.dds"));
-        _payloadZip = Path.Combine(baseDir, "Payload", "moddingapi_payload.zip");
+            IOPath.Combine(baseDir, "Resources", "TemplateImages", "stage_icon.dds"));
+        _payloadZip = IOPath.Combine(baseDir, "Payload", "moddingapi_payload.zip");
         CopyBundledAsset("Payload/moddingapi_payload.zip", _payloadZip);
-        _baseParamZip = Path.Combine(baseDir, "Payload", "nsc_param_base.zip");
+        _baseParamZip = IOPath.Combine(baseDir, "Payload", "nsc_param_base.zip");
         CopyBundledAsset("Payload/nsc_param_base.zip", _baseParamZip);
-        _messageBaseZip = Path.Combine(baseDir, "Payload", "nsc_message_base.zip");
+        _messageBaseZip = IOPath.Combine(baseDir, "Payload", "nsc_message_base.zip");
         CopyBundledAsset("Payload/nsc_message_base.zip", _messageBaseZip);
         Directory.SetCurrentDirectory(baseDir);
     }
 
     void CopyBundledAsset(string assetName, string destination)
     {
-        string? dir = Path.GetDirectoryName(destination);
+        string? dir = IOPath.GetDirectoryName(destination);
         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
         string temp = destination + ".new";
         if (File.Exists(temp)) File.Delete(temp);
@@ -91,7 +92,8 @@ public sealed class MainActivity : Activity
         logo.SetImageResource(Resource.Drawable.ic_launcher_foreground);
         logo.SetPadding(Dp(2), Dp(2), Dp(2), Dp(2));
         headerRow.AddView(logo, new LinearLayout.LayoutParams(Dp(72), Dp(72)) { RightMargin = Dp(12) });
-        var titleCol = new LinearLayout(this) { Orientation = Orientation.Vertical, Gravity = GravityFlags.CenterVertical };
+        var titleCol = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        titleCol.SetGravity(GravityFlags.CenterVertical);
         var title = new TextView(this) { Text = "NSC MOD MANAGER", TextSize = 23 };
         title.SetTextColor(Color.White);
         title.SetTypeface(Android.Graphics.Typeface.Default, Android.Graphics.TypefaceStyle.Bold);
@@ -198,11 +200,12 @@ public sealed class MainActivity : Activity
 
     int Dp(int value) => (int)(value * Resources!.DisplayMetrics!.Density + 0.5f);
 
-    LinearLayout Row() => new(this)
+    LinearLayout Row()
     {
-        Orientation = Orientation.Horizontal,
-        Gravity = GravityFlags.CenterVertical
-    };
+        var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+        row.SetGravity(GravityFlags.CenterVertical);
+        return row;
+    }
 
     LinearLayout Panel()
     {
@@ -381,10 +384,10 @@ public sealed class MainActivity : Activity
             _prefs.ModsPath = _modsPath.Text?.Trim() ?? _prefs.ModsPath;
             Directory.CreateDirectory(_prefs.ModsPath);
             string display = GetDisplayName(data.Data) ?? "mod.nsc";
-            string ext = Path.GetExtension(display).ToLowerInvariant();
+            string ext = IOPath.GetExtension(display).ToLowerInvariant();
             if (ext is not (".nsc" or ".ensc" or ".uns" or ".unse" or ".nus4"))
                 throw new InvalidDataException("Choose .nsc, .ensc, .uns, .unse, or .nus4 file.");
-            string temp = Path.Combine(CacheDir?.AbsolutePath ?? FilesDir!.AbsolutePath, display);
+            string temp = IOPath.Combine(CacheDir?.AbsolutePath ?? FilesDir!.AbsolutePath, display);
             using (var src = ContentResolver?.OpenInputStream(data.Data) ?? throw new IOException("Cannot read selected mod file."))
             using (var dst = File.Create(temp)) src.CopyTo(dst);
             string installed = _installer.Install(temp, _prefs.ModsPath);
@@ -569,7 +572,7 @@ public sealed class MainActivity : Activity
 
             _compileButton.Enabled = false;
             SetStatus("Starting compile...");
-            string work = Path.Combine(CacheDir?.AbsolutePath ?? FilesDir!.AbsolutePath, "compile_work");
+            string work = IOPath.Combine(CacheDir?.AbsolutePath ?? FilesDir!.AbsolutePath, "compile_work");
             IProgress<string> progress = new Progress<string>(message => SetStatus(message));
 
             CompileResult result = await Task.Run(() =>
@@ -601,9 +604,9 @@ public sealed class MainActivity : Activity
         {
             string game = _prefs.GamePath;
             if (string.IsNullOrWhiteSpace(game) || !Directory.Exists(game)) return null;
-            string dir = Path.Combine(game, "moddingapi", "mods", "base_game");
+            string dir = IOPath.Combine(game, "moddingapi", "mods", "base_game");
             Directory.CreateDirectory(dir);
-            string path = Path.Combine(dir, "nsc_android_last_error.txt");
+            string path = IOPath.Combine(dir, "nsc_android_last_error.txt");
             File.WriteAllText(path,
                 "NSC Mod Manager Android — v0.5.0 last compile error" + System.Environment.NewLine +
                 "Time: " + DateTime.Now.ToString("O") + System.Environment.NewLine +
@@ -627,7 +630,7 @@ public sealed class MainActivity : Activity
             SaveGamePath();
             var check = PathValidator.ValidateGamePath(_prefs.GamePath);
             if (!check.Ok) { SetStatus(check.Message); return; }
-            string probe = Path.Combine(_prefs.GamePath, "moddingapi", "mods", "base_game", "NSCApiRuntimeProbe.dll");
+            string probe = IOPath.Combine(_prefs.GamePath, "moddingapi", "mods", "base_game", "NSCApiRuntimeProbe.dll");
             if (!File.Exists(probe))
                 ModdingApiInstaller.InstallRuntimeProbe(_payloadZip, _prefs.GamePath);
             UltimateStormApiDiagnostics.ArmProbe(_prefs.GamePath);
@@ -676,15 +679,15 @@ public sealed class MainActivity : Activity
             if (!check.Ok) { SetStatus(check.Message); return; }
             string root;
             if (string.IsNullOrWhiteSpace(_prefs.ModsPath))
-                root = Path.Combine(Android.OS.Environment.ExternalStorageDirectory?.AbsolutePath ?? "/storage/emulated/0", "NSC-ModManager");
+                root = IOPath.Combine(Android.OS.Environment.ExternalStorageDirectory?.AbsolutePath ?? "/storage/emulated/0", "NSC-ModManager");
             else
             {
-                string mods = _prefs.ModsPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                root = string.Equals(Path.GetFileName(mods), "mods", StringComparison.OrdinalIgnoreCase)
-                    ? (Path.GetDirectoryName(mods) ?? mods)
+                string mods = _prefs.ModsPath.TrimEnd(IOPath.DirectorySeparatorChar, IOPath.AltDirectorySeparatorChar);
+                root = string.Equals(IOPath.GetFileName(mods), "mods", StringComparison.OrdinalIgnoreCase)
+                    ? (IOPath.GetDirectoryName(mods) ?? mods)
                     : mods;
             }
-            string export = Path.Combine(root, "logs");
+            string export = IOPath.Combine(root, "logs");
             IReadOnlyList<string> files = UltimateStormApiDiagnostics.ExportDiagnostics(_prefs.GamePath, export);
             SetStatus($"Exported {files.Count} API diagnostic file(s) to {export}");
         }
@@ -699,13 +702,13 @@ public sealed class MainActivity : Activity
         try
         {
             string cache = CacheDir?.AbsolutePath ?? FilesDir!.AbsolutePath;
-            string work = Path.Combine(cache, "cpk_test_input");
-            string extract = Path.Combine(cache, "cpk_test_extract");
+            string work = IOPath.Combine(cache, "cpk_test_input");
+            string extract = IOPath.Combine(cache, "cpk_test_extract");
             if (Directory.Exists(work)) Directory.Delete(work, true);
             if (Directory.Exists(extract)) Directory.Delete(extract, true);
             Directory.CreateDirectory(work);
-            File.WriteAllText(Path.Combine(work, "hello.txt"), "NSC Android CPK bridge pack/extract test");
-            string cpk = Path.Combine(cache, "cpk_test.cpk");
+            File.WriteAllText(IOPath.Combine(work, "hello.txt"), "NSC Android CPK bridge pack/extract test");
+            string cpk = IOPath.Combine(cache, "cpk_test.cpk");
             if (File.Exists(cpk)) File.Delete(cpk);
 
             int packCode = NativeCpk.Pack(work, cpk, false, 1);
@@ -717,7 +720,7 @@ public sealed class MainActivity : Activity
 
             Directory.CreateDirectory(extract);
             int extractCode = NativeCpk.Extract(cpk, extract);
-            string restored = Path.Combine(extract, "hello.txt");
+            string restored = IOPath.Combine(extract, "hello.txt");
             bool ok = extractCode == 0 && File.Exists(restored) && File.ReadAllText(restored).Contains("pack/extract test", StringComparison.Ordinal);
             SetStatus(ok
                 ? $"CPK native pack+extract OK: {new FileInfo(cpk).Length:N0} bytes"
